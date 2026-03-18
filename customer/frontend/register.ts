@@ -8,6 +8,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const faculty = document.getElementById("faculty") as HTMLSelectElement;
     const gender = document.getElementById("gender") as HTMLSelectElement;
 
+    const branch = document.getElementById("branch") as HTMLSelectElement;
+
     // -------------------------
     // show / hide student row
     // -------------------------
@@ -63,8 +65,28 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    async function loadBranches() {
+        try {
+            const res = await fetch("/sports_rental_system/customer/api/get_branches.php");
+            const data = await res.json();
+
+            branch.innerHTML = `<option value="">-- เลือกมหาวิทยาลัย --</option>`;
+
+            data.forEach((b: any) => {
+                const opt = document.createElement("option");
+                opt.value = b.branch_id;
+                opt.textContent = b.name;
+                branch.appendChild(opt);
+            });
+
+        } catch (err) {
+            console.error("โหลดมหาลัยไม่สำเร็จ", err);
+        }
+    }
+
     loadFaculties();
     loadGenders();
+    loadBranches();
 
     // -------------------------
     // submit register
@@ -80,6 +102,8 @@ document.addEventListener("DOMContentLoaded", () => {
             birthday: (document.getElementById("birthday") as HTMLInputElement).value,
             gender_id: gender.value,
             customerType: customerType.value,
+
+            branch_id: branch.value || null,
 
             faculty_id: faculty.value || null,
             year: (document.getElementById("year") as HTMLSelectElement).value || null,

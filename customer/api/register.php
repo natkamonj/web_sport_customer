@@ -51,6 +51,8 @@ $gender_id  = $data["gender_id"] ?? null;
 
 $customer_type = $data["customerType"] ?? "";
 
+$branch_id = $data["branch_id"] ?? null;
+
 $faculty_id = $data["faculty_id"] ?? null;
 $study_year = $data["year"] ?? null;
 
@@ -101,6 +103,16 @@ if ($customer_type === "student") {
     }
 }
 
+if ($customer_type === "student") {
+    if (!$faculty_id || !$study_year || !$branch_id) {
+        echo json_encode([
+            "success" => false,
+            "message" => "กรุณากรอกข้อมูลนิสิตให้ครบ"
+        ]);
+        exit;
+    }
+}
+
 // ---------------------------------
 // CHECK email ซ้ำ
 // ---------------------------------
@@ -136,14 +148,14 @@ $hash = password_hash($password, PASSWORD_DEFAULT);
 $sql = "
 INSERT INTO customers
 (customer_id, email, name, phone, birth_date, gender_id,
-customer_type, faculty_id, study_year, password_hash)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+customer_type, branch_id, faculty_id, study_year, password_hash)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ";
 
 $stmt = $conn->prepare($sql);
 
 $stmt->bind_param(
-    "sssssisiis",
+    "sssssissiis",
     $customer_id,
     $email,
     $name,
@@ -151,6 +163,7 @@ $stmt->bind_param(
     $birth_date,
     $gender_id,
     $customer_type,
+    $branch_id,
     $faculty_id,
     $study_year,
     $hash

@@ -94,7 +94,7 @@ body {
 .main {
   display: flex;
   flex-direction: column;
-  gap: 32px;   /* เพิ่ม spacing ให้โล่งขึ้น */
+  gap: 36px;
 }
 
 /* ================= SIDEBAR ================= */
@@ -103,7 +103,7 @@ body {
   background: #ffffff;
   padding: 22px;
   border-radius: 16px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.05);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -153,14 +153,6 @@ body {
   background: #e66c00;
 }
 
-/* ================= SECTION TITLE ================= */
-
-.section-title {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-
 /* ================= KPI ================= */
 
 .kpi-grid {
@@ -173,9 +165,18 @@ body {
   background: #ffffff;
   padding: 22px;
   border-radius: 14px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.03);
-  border-top: 3px solid #ff7a00;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+  transition: 0.2s ease;
 }
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+}
+
+.kpi-card:nth-child(1) { border-top: 4px solid #3b82f6; }
+.kpi-card:nth-child(2) { border-top: 4px solid #22c55e; }
+.kpi-card:nth-child(3) { border-top: 4px solid #ef4444; }
+.kpi-card:nth-child(4) { border-top: 4px solid #f59e0b; }
 
 .kpi-title {
   font-size: 13px;
@@ -194,16 +195,17 @@ body {
   background: #ffffff;
   padding: 26px;
   border-radius: 16px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.03);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+  transition: 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
 }
 
 .card h3 {
   margin: 0 0 14px;
   font-size: 16px;
-}
-
-.card canvas {
-  margin-top: 8px;
 }
 
 /* ================= GRID ================= */
@@ -214,47 +216,26 @@ body {
   gap: 24px;
 }
 
-/* Pie เล็กลง */
-.small-grid .card {
-  min-height: 260px;
+/* ================= CHART SIZE (🔥 สำคัญ) ================= */
+
+canvas {
+  width: 100% !important;
+  height: 380px !important;
 }
 
-.small-grid canvas {
-  max-height: 220px !important;
+/* กราฟหลัก */
+#trendChart {
+  height: 420px !important;
 }
 
-/* กราฟหลักใหญ่ขึ้น */
-.large-card {
-  min-height: 420px;
+/* top 5 */
+#topChart {
+  height: 420px !important;
 }
 
-/* ================= AVERAGE BOX ================= */
-
-.avg-box {
-  margin-top: 14px;
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-  color: #6b7280;
-}
-
-/* ================= BIG OPERATIONS ================= */
-
-.big-operations {
-  gap: 28px;
-}
-
-.big-operations .card {
-  min-height: 460px;       /* ขยายกรอบ */
-  padding: 32px;           /* เพิ่มพื้นที่ด้านใน */
-}
-
-.big-operations canvas {
-  max-height: 360px !important;
-}
-
-.big-operations .card {
-  min-height: 480px;
+/* channel */
+#channelChart {
+  height: 400px !important;
 }
 
 /* ================= RESPONSIVE ================= */

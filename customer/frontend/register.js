@@ -41,6 +41,7 @@ document.addEventListener("DOMContentLoaded", function () {
     var studentRow = document.getElementById("student-row");
     var faculty = document.getElementById("faculty");
     var gender = document.getElementById("gender");
+    var branch = document.getElementById("branch");
     // -------------------------
     // show / hide student row
     // -------------------------
@@ -118,13 +119,44 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         });
     }
+    function loadBranches() {
+        return __awaiter(this, void 0, void 0, function () {
+            var res, data, err_3;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0:
+                        _a.trys.push([0, 3, , 4]);
+                        return [4 /*yield*/, fetch("/sports_rental_system/customer/api/get_branches.php")];
+                    case 1:
+                        res = _a.sent();
+                        return [4 /*yield*/, res.json()];
+                    case 2:
+                        data = _a.sent();
+                        branch.innerHTML = "<option value=\"\">-- \u0E40\u0E25\u0E37\u0E2D\u0E01\u0E21\u0E2B\u0E32\u0E27\u0E34\u0E17\u0E22\u0E32\u0E25\u0E31\u0E22 --</option>";
+                        data.forEach(function (b) {
+                            var opt = document.createElement("option");
+                            opt.value = b.branch_id;
+                            opt.textContent = b.name;
+                            branch.appendChild(opt);
+                        });
+                        return [3 /*break*/, 4];
+                    case 3:
+                        err_3 = _a.sent();
+                        console.error("โหลดมหาลัยไม่สำเร็จ", err_3);
+                        return [3 /*break*/, 4];
+                    case 4: return [2 /*return*/];
+                }
+            });
+        });
+    }
     loadFaculties();
     loadGenders();
+    loadBranches();
     // -------------------------
     // submit register
     // -------------------------
     form.addEventListener("submit", function (e) { return __awaiter(_this, void 0, void 0, function () {
-        var payload, res, data, err_3;
+        var payload, res, data, err_4;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
@@ -136,6 +168,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         birthday: document.getElementById("birthday").value,
                         gender_id: gender.value,
                         customerType: customerType.value,
+                        branch_id: branch.value || null,
                         faculty_id: faculty.value || null,
                         year: document.getElementById("year").value || null,
                         password: document.getElementById("password").value,
@@ -166,9 +199,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     }
                     return [3 /*break*/, 5];
                 case 4:
-                    err_3 = _a.sent();
+                    err_4 = _a.sent();
                     alert("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้");
-                    console.error(err_3);
+                    console.error(err_4);
                     return [3 /*break*/, 5];
                 case 5: return [2 /*return*/];
             }

@@ -199,7 +199,7 @@ if (!empty($coupon["allowed_member_level"]) &&
 }
 
 /* ===============================
-   PER USER LIMIT
+   PER USER LIMIT LooK C
 ================================ */
 
 if (!empty($coupon["per_user_limit"])) {

@@ -1,25 +1,23 @@
-// ใช้ Chart จาก CDN (global)
+// ใช้ Chart จาก CDN
 declare const Chart: any;
 
-let trendChart: any;
-let topChart: any;
-let paymentChart: any;
-let bookingRatioChart: any;
-let profitChart: any;
+let bookingTrendChart: any;
+let revenueTrendChart: any;
 let channelChart: any;
-
+let bookingRatioChart: any;
+let branchChart: any;
 
 /* ==============================
-	 INIT
+   INIT
 ============================== */
 
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", function () {
 
 	initCharts();
 
-	await loadRegions();
-	await loadProvinces();
-	await loadBranches();
+	loadRegions();
+	loadProvinces();
+	loadBranches();
 
 	bindFilters();
 
@@ -27,7 +25,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 /* ==============================
-	 BIND EVENTS
+   FILTER EVENTS
 ============================== */
 
 function bindFilters(): void {
@@ -37,15 +35,12 @@ function bindFilters(): void {
 		"regionSelect",
 		"provinceSelect",
 		"branchSelect",
-		"bookingTypeSelect",
 		"startDate",
 		"endDate"
 	];
 
 	ids.forEach(id => {
-		const el = document.getElementById(id) as
-			HTMLSelectElement | HTMLInputElement | null;
-
+		const el = document.getElementById(id) as any;
 		if (!el) return;
 
 		el.addEventListener("change", () => {
@@ -54,381 +49,300 @@ function bindFilters(): void {
 		});
 	});
 
-	document
-		.getElementById("resetFilter")
+	document.getElementById("resetFilter")
 		?.addEventListener("click", resetFilter);
 }
 
 /* ==============================
-	 FILTER
+   FILTER LOGIC
 ============================== */
 
-interface DashboardFilter {
-	range: string;
-	start: string;
-	end: string;
-	region_id: string;
-	province_id: string;
-	branch_id: string;
-	booking_type_id: string;
-}
-
-function getFilter(): DashboardFilter {
+function getFilter() {
 	return {
-		range: (document.getElementById("rangeSelect") as HTMLSelectElement)?.value || "",
-		start: (document.getElementById("startDate") as HTMLInputElement)?.value || "",
-		end: (document.getElementById("endDate") as HTMLInputElement)?.value || "",
-		region_id: (document.getElementById("regionSelect") as HTMLSelectElement)?.value || "",
-		province_id: (document.getElementById("provinceSelect") as HTMLSelectElement)?.value || "",
-		branch_id: (document.getElementById("branchSelect") as HTMLSelectElement)?.value || "",
-		booking_type_id: (document.getElementById("bookingTypeSelect") as HTMLSelectElement)?.value || ""
+		range: (document.getElementById("rangeSelect") as any)?.value || "",
+		start: (document.getElementById("startDate") as any)?.value || "",
+		end: (document.getElementById("endDate") as any)?.value || "",
+		region_id: (document.getElementById("regionSelect") as any)?.value || "",
+		province_id: (document.getElementById("provinceSelect") as any)?.value || "",
+		branch_id: (document.getElementById("branchSelect") as any)?.value || ""
 	};
 }
 
 function toggleCustomDate(): void {
-	const range = (document.getElementById("rangeSelect") as HTMLSelectElement).value;
+	const range = (document.getElementById("rangeSelect") as any).value;
 	const box = document.getElementById("customDateBox") as HTMLElement;
 	box.style.display = range === "custom" ? "block" : "none";
 }
 
 function resetFilter(): void {
 
-	(document.getElementById("rangeSelect") as HTMLSelectElement).value = "30days";
-	(document.getElementById("regionSelect") as HTMLSelectElement).value = "";
-	(document.getElementById("provinceSelect") as HTMLSelectElement).value = "";
-	(document.getElementById("branchSelect") as HTMLSelectElement).value = "";
-	(document.getElementById("bookingTypeSelect") as HTMLSelectElement).value = "";
+	(document.getElementById("rangeSelect") as any).value = "30days";
+	(document.getElementById("regionSelect") as any).value = "";
+	(document.getElementById("provinceSelect") as any).value = "";
+	(document.getElementById("branchSelect") as any).value = "";
 
-	(document.getElementById("startDate") as HTMLInputElement).value = "";
-	(document.getElementById("endDate") as HTMLInputElement).value = "";
+	(document.getElementById("startDate") as any).value = "";
+	(document.getElementById("endDate") as any).value = "";
 
 	loadAll();
 }
 
 /* ==============================
-	 LOAD DASHBOARD
+   LOAD DASHBOARD
 ============================== */
 
-async function loadAll(): Promise<void> {
+function loadAll(): void {
 
-	try {
+	fetch("/sports_rental_system/executive/api/dashboard_summary.php", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(getFilter())
+	})
+		.then(res => res.json())
+		.then(result => {
 
-		const res = await fetch(
-			"/sports_rental_system/executive/api/dashboard_summary.php",
-			{
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(getFilter())
-			}
-		);
+			updateKPI(result.kpi);
 
-		const result = await res.json();
+			updateBookingTrend(result.trend);
+			updateRevenueTrend(result.trend);
 
-		updateKPI(result.kpi);
-		updateTrend(result.trend);
-		updateProfit(result.profit_trend);
-		updatePayment(result.payment_ratio);
-		updateBookingRatio(result.booking_ratio);
-		updateTop5(result.top5);
-		updateChannelDaily(result.channel_daily);
+			updateChannel(result.channel);
 
-	} catch (err) {
-		console.error("โหลด Dashboard ไม่สำเร็จ", err);
-	}
+			// ✅ FIX: ต้องเรียกอันนี้
+			updateBookingRatio(result.booking_ratio);
+
+			updateBranches(result.branches);
+
+		})
+		.catch(err => console.error("โหลด Dashboard ไม่สำเร็จ", err));
 }
 
 /* ==============================
-	 KPI
+   KPI
 ============================== */
 
 function updateKPI(kpi: any): void {
 
 	document.getElementById("kpiBookings")!.textContent =
-		String(kpi?.total_bookings ?? 0);
-
+		Number(kpi?.total_bookings ?? 0).toLocaleString() + " ครั้ง";
 
 	document.getElementById("kpiRevenue")!.textContent =
 		Number(kpi?.total_revenue ?? 0).toLocaleString() + " บาท";
 
-	document.getElementById("kpiExpense")!.textContent =
-		Number(kpi?.total_expense ?? 0).toLocaleString() + " บาท";
+	document.getElementById("kpiAvg")!.textContent =
+		Number(kpi?.revenue_per_booking ?? 0)
+			.toLocaleString(undefined, { maximumFractionDigits: 2 }) + " บาท/ครั้ง";
 
-	document.getElementById("kpiProfit")!.textContent =
-		Number(kpi?.net_profit ?? 0).toLocaleString() + " บาท";
+	document.getElementById("kpiCancel")!.textContent =
+		Number(kpi?.cancellation_rate ?? 0).toFixed(2) + " %";
 }
 
 /* ==============================
-	 TREND
+   UPDATE CHARTS
 ============================== */
 
-function updateTrend(trend: any): void {
-
-	trendChart.data.labels = trend?.labels || [];
-	trendChart.data.datasets[0].data = trend?.bookings || [];
-	trendChart.data.datasets[1].data = trend?.revenue || [];
-	trendChart.update();
+function updateBookingTrend(data: any): void {
+	bookingTrendChart.data.labels = data?.labels || [];
+	bookingTrendChart.data.datasets[0].data = data?.bookings || [];
+	bookingTrendChart.update();
 }
 
-/* ==============================
-	 PROFIT
-============================== */
-
-function updateProfit(data: any): void {
-
-	profitChart.data.labels = data?.labels || [];
-	profitChart.data.datasets[0].data = data?.revenue || [];
-	profitChart.data.datasets[1].data = data?.expense || [];
-	profitChart.update();
+function updateRevenueTrend(data: any): void {
+	revenueTrendChart.data.labels = data?.labels || [];
+	revenueTrendChart.data.datasets[0].data = data?.revenue || [];
+	revenueTrendChart.update();
 }
 
-/* ==============================
-	 PAYMENT PIE
-============================== */
-
-function updatePayment(data: any): void {
-
-	paymentChart.data.labels = data?.labels || [];
-	paymentChart.data.datasets[0].data = data?.data || [];
-	paymentChart.update();
-}
-
-/* ==============================
-	 BOOKING RATIO PIE
-============================== */
-
-function updateBookingRatio(data: any): void {
-
-	bookingRatioChart.data.labels = data?.labels || [];
-	bookingRatioChart.data.datasets[0].data = data?.data || [];
-	bookingRatioChart.update();
-}
-
-/* ==============================
-	 DROPDOWNS (FIXED)
-============================== */
-
-async function loadRegions(): Promise<void> {
-
-	const res = await fetch("/sports_rental_system/executive/api/get_regions.php");
-	const json = await res.json();
-
-	const data = Array.isArray(json) ? json : json.data;
-
-	const select = document.getElementById("regionSelect") as HTMLSelectElement;
-	select.innerHTML = `<option value="">ทั้งหมด</option>`;
-
-	if (!data) return;
-
-	data.forEach((r: any) => {
-		select.innerHTML += `<option value="${r.region_id}">${r.region_name}</option>`;
-	});
-}
-
-async function loadProvinces(): Promise<void> {
-
-	const res = await fetch("/sports_rental_system/executive/api/get_provinces.php");
-	const json = await res.json();
-
-	const data = Array.isArray(json) ? json : json.data;
-
-	const select = document.getElementById("provinceSelect") as HTMLSelectElement;
-	select.innerHTML = `<option value="">ทั้งหมด</option>`;
-
-	if (!data) return;
-
-	data.forEach((p: any) => {
-		select.innerHTML += `<option value="${p.province_id}">${p.name}</option>`;
-	});
-}
-
-async function loadBranches(): Promise<void> {
-
-	const res = await fetch("/sports_rental_system/executive/api/get_branches.php");
-	const json = await res.json();
-
-	const data = Array.isArray(json) ? json : json.data;
-
-	const select = document.getElementById("branchSelect") as HTMLSelectElement;
-	select.innerHTML = `<option value="">ทั้งหมด</option>`;
-
-	if (!data) return;
-
-	data.forEach((b: any) => {
-		select.innerHTML += `<option value="${b.branch_id}">${b.name}</option>`;
-	});
-}
-
-function updateTop5(top: any): void {
-
-	const count = top?.counts?.length || 0;
-
-	const colors = [];
-	for (let i = 0; i < count; i++) {
-		const opacity = 1 - (i * 0.05);
-		colors.push(`rgba(255,122,0,${opacity})`);
-	}
-
-	topChart.data.labels = top?.labels || [];
-	topChart.data.datasets[0].data = top?.counts || [];
-	topChart.data.datasets[0].backgroundColor = colors;
-
-	topChart.update();
-}
-
-function updateChannelDaily(data: any): void {
-
+function updateChannel(data: any): void {
 	channelChart.data.labels = data?.labels || [];
-	channelChart.data.datasets[0].data = data?.online || [];
-	channelChart.data.datasets[1].data = data?.walkin || [];
-
+	channelChart.data.datasets[0].data = data?.data || [];
 	channelChart.update();
 }
 
+// ✅ FIX หลักอยู่ตรงนี้
+function updateBookingRatio(data: any): void {
+
+	const labels = data?.labels || [];
+	const values = data?.data || [];
+
+	// 🎨 สีตาม label
+	const colors = labels.map((label: string) => {
+		if (label === "สำเร็จ") return "#22c55e";
+		if (label === "ยกเลิก") return "#ef4444";
+		return "#9ca3af";
+	});
+
+	bookingRatioChart.data.labels = labels;
+	bookingRatioChart.data.datasets[0].data = values;
+	bookingRatioChart.data.datasets[0].backgroundColor = colors;
+
+	bookingRatioChart.update();
+}
+
+function updateBranches(data: any): void {
+	branchChart.data.labels = data?.labels || [];
+	branchChart.data.datasets[0].data = data?.data || [];
+	branchChart.update();
+}
 
 /* ==============================
-	 INIT CHARTS
+   DROPDOWNS
+============================== */
+
+function loadRegions(): void {
+	fetch("/sports_rental_system/executive/api/get_regions.php")
+		.then(res => res.json())
+		.then(res => {
+
+			const data = res.data || []; // ✅ FIX
+
+			const select = document.getElementById("regionSelect") as HTMLSelectElement;
+			select.innerHTML = `<option value="">ทั้งหมด</option>`;
+
+			data.forEach((r: any) => {
+				select.innerHTML += `<option value="${r.region_id}">${r.region_name}</option>`;
+			});
+		});
+}
+
+
+function loadProvinces(): void {
+
+	const regionId = (document.getElementById("regionSelect") as any)?.value || "";
+
+	fetch("/sports_rental_system/executive/api/get_provinces.php", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ region_id: regionId }) // ✅ ส่งค่า
+	})
+		.then(res => res.json())
+		.then(res => {
+
+			const data = res.data || []; // ✅ FIX
+
+			const select = document.getElementById("provinceSelect") as HTMLSelectElement;
+			select.innerHTML = `<option value="">ทั้งหมด</option>`;
+
+			data.forEach((p: any) => {
+				select.innerHTML += `<option value="${p.province_id}">${p.name}</option>`;
+			});
+		});
+}
+
+
+function loadBranches(): void {
+
+	const regionId = (document.getElementById("regionSelect") as any)?.value || "";
+	const provinceId = (document.getElementById("provinceSelect") as any)?.value || "";
+
+	fetch("/sports_rental_system/executive/api/get_branches.php", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			region_id: regionId,
+			province_id: provinceId
+		}) // ✅ ส่งค่า
+	})
+		.then(res => res.json())
+		.then(res => {
+
+			const data = res.data || []; // ✅ FIX
+
+			const select = document.getElementById("branchSelect") as HTMLSelectElement;
+			select.innerHTML = `<option value="">ทั้งหมด</option>`;
+
+			data.forEach((b: any) => {
+				select.innerHTML += `<option value="${b.branch_id}">${b.name}</option>`;
+			});
+		});
+}
+
+/* ==============================
+   INIT CHARTS
 ============================== */
 
 function initCharts(): void {
 
-	trendChart = new Chart(document.getElementById("trendChart"), {
+	const baseOptions = {
+		responsive: true,
+		maintainAspectRatio: false,
+		plugins: {
+			legend: {
+				position: "bottom"
+			}
+		}
+	};
+
+	bookingTrendChart = new Chart(document.getElementById("bookingTrendChart"), {
 		type: "line",
 		data: {
 			labels: [],
-			datasets: [
-				{
-					label: "จำนวนการจอง",
-					data: [],
-					borderColor: "#ff7a00",
-					yAxisID: "yBookings",
-					tension: 0.3
-				},
-				{
-					label: "รายได้",
-					data: [],
-					borderColor: "#3b82f6",
-					yAxisID: "yRevenue",
-					tension: 0.3
-				}
-			]
+			datasets: [{
+				label: "จำนวนการจอง",
+				data: [],
+				borderColor: "#ff7a00",
+				backgroundColor: "rgba(255,122,0,0.15)",
+				fill: true,
+				tension: 0.4
+			}]
 		},
-		options: {
-			responsive: true,
-			scales: {
-				yBookings: {
-					type: "linear",
-					position: "left",
-					title: {
-						display: true,
-						text: "จำนวนการจอง"
-					}
-				},
-				yRevenue: {
-					type: "linear",
-					position: "right",
-					grid: {
-						drawOnChartArea: false
-					},
-					title: {
-						display: true,
-						text: "รายได้ (บาท)"
-					}
-				}
-			}
-		}
+		options: baseOptions
 	});
 
-	topChart = new Chart(document.getElementById("topChart"), {
+	revenueTrendChart = new Chart(document.getElementById("revenueTrendChart"), {
+		type: "line",
+		data: {
+			labels: [],
+			datasets: [{
+				label: "รายได้",
+				data: [],
+				borderColor: "#3b82f6",
+				backgroundColor: "rgba(59,130,246,0.15)",
+				fill: true,
+				tension: 0.4
+			}]
+		},
+		options: baseOptions
+	});
+
+	channelChart = new Chart(document.getElementById("channelChart"), {
 		type: "bar",
 		data: {
 			labels: [],
-			datasets: [
-				{ label: "จำนวนครั้งที่ถูกจอง", data: [] }
-			]
+			datasets: [{
+				label: "รายได้",
+				data: [],
+				backgroundColor: ["#3b82f6", "#22c55e"]
+			}]
 		},
-		options: {
-			responsive: true,
-			maintainAspectRatio: false,
-			plugins: {
-				legend: { position: "top" }
-			}
-		}
+		options: baseOptions
 	});
 
-	paymentChart = new Chart(document.getElementById("paymentChart"), {
+	bookingRatioChart = new Chart(document.getElementById("bookingRatioChart"), {
 		type: "doughnut",
 		data: {
 			labels: [],
 			datasets: [{
 				data: [],
-				backgroundColor: [
-					"#22c55e",
-					"#8b5cf6"
-				],
-				borderWidth: 0
+				backgroundColor: [] 
 			}]
 		},
 		options: {
-			cutout: "65%",
-			plugins: {
-				legend: { position: "top" }
-			}
+			...baseOptions,
+			cutout: "65%"
 		}
 	});
 
-	bookingRatioChart = new Chart(document.getElementById("bookingRatioChart"), {
-		type: "pie",
-		data: {
-			labels: [],
-			datasets: [{
-				data: [],
-				backgroundColor: [
-					"#ff53d7",
-					"#1ea9ff"
-				]
-			}]
-		}
-	});
-
-	profitChart = new Chart(document.getElementById("profitChart"), {
-		type: "line",
-		data: {
-			labels: [],
-			datasets: [
-				{ label: "รายได้", data: [], borderColor: "#22c55e" },
-				{ label: "ค่าใช้จ่าย", data: [], borderColor: "#ef4444" }
-			]
-		}
-	});
-
-	channelChart = new Chart(
-	document.getElementById("channelChart"),
-	{
+	branchChart = new Chart(document.getElementById("topChart"), {
 		type: "bar",
 		data: {
 			labels: [],
-			datasets: [
-				{
-					label: "ออนไลน์",
-					data: [],
-					backgroundColor: "#1ea9ff"
-				},
-				{
-					label: "หน้าร้าน",
-					data: [],
-					backgroundColor: "#ff53d7"
-				}
-			]
+			datasets: [{
+				label: "จำนวนการจอง",
+				data: [],
+				backgroundColor: "#ff7a00"
+			}]
 		},
-		options: {
-			responsive: true,
-			maintainAspectRatio: false,
-			plugins: {
-				legend: { position: "top" }
-			}
-		}
-	}
-);
-
-
+		options: baseOptions
+	});
 }

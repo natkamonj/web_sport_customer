@@ -1,15 +1,13 @@
 <?php
 require_once "../../database.php";
-
 header("Content-Type: application/json; charset=utf-8");
 
 try {
 
-$data = json_decode(file_get_contents("php://input"), true);
-if (!$data) $data = [];
+$data = json_decode(file_get_contents("php://input"), true) ?? [];
 
 /* ==============================
-   RECEIVE FILTER
+   FILTER
 ============================== */
 
 $region_id       = $data["region_id"] ?? "";
@@ -21,7 +19,17 @@ $start           = $data["start"] ?? "";
 $end             = $data["end"] ?? "";
 
 /* ==============================
-   BUILD WHERE (BOOKINGS)
+   JOIN (BOOKING BASE)
+============================== */
+
+$join = "
+JOIN branches b ON bk.branch_id = b.branch_id
+JOIN provinces p ON b.province_id = p.province_id
+JOIN region r ON p.region_id = r.region_id
+";
+
+/* ==============================
+   WHERE (BOOKING BASE)
 ============================== */
 
 $where = [];
@@ -41,18 +49,12 @@ if ($province_id !== "") {
 }
 
 if ($branch_id !== "") {
-    $where[] = "b.branch_id = ?";
+    $where[] = "bk.branch_id = ?";
     $params[] = $branch_id;
     $types .= "s";
 }
 
-if ($booking_type_id !== "") {
-    $where[] = "bk.booking_type_id = ?";
-    $params[] = (int)$booking_type_id;
-    $types .= "i";
-}
-
-/* DATE FILTER */
+/* DATE */
 
 if ($range === "7days")
     $where[] = "bk.pickup_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
@@ -70,95 +72,64 @@ elseif ($range === "custom" && $start && $end) {
 $whereSQL = count($where) ? "WHERE " . implode(" AND ", $where) : "";
 
 /* ==============================
+   HELPER
+============================== */
+
+function runQuery($conn, $sql, $types, $params) {
+    $stmt = $conn->prepare($sql);
+    if ($types) $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    return $stmt->get_result()->fetch_assoc();
+}
+
+/* ==============================
    KPI
 ============================== */
 
-$sqlKPI = "
-SELECT 
-    COUNT(bk.booking_id) total_bookings,
-    COALESCE(SUM(bk.net_amount),0) total_revenue,
-    COUNT(DISTINCT bk.customer_id) total_users
+$sqlTotal = "SELECT COUNT(*) total_bookings FROM bookings bk $join $whereSQL";
+
+$sqlRevenue = "
+SELECT COALESCE(SUM(bk.net_amount),0) total_revenue
 FROM bookings bk
-JOIN branches b ON bk.branch_id=b.branch_id
-JOIN provinces p ON b.province_id=p.province_id
-JOIN region r ON p.region_id=r.region_id
+$join
+$whereSQL
+" . ($whereSQL ? " AND" : " WHERE") . " bk.booking_status_id = 5";
+
+$sqlAvg = "
+SELECT COALESCE(SUM(bk.net_amount),0) / NULLIF(COUNT(*),0) revenue_per_booking
+FROM bookings bk
+$join
+$whereSQL
+" . ($whereSQL ? " AND" : " WHERE") . " bk.booking_status_id = 5";
+
+$sqlCancel = "
+SELECT 
+(SUM(CASE WHEN bk.booking_status_id = 6 THEN 1 ELSE 0 END) * 100.0 
+ / NULLIF(SUM(CASE WHEN bk.booking_status_id IN (5,6) THEN 1 ELSE 0 END),0)) 
+AS cancellation_rate
+FROM bookings bk
+$join
 $whereSQL
 ";
 
-$stmt = $conn->prepare($sqlKPI);
-if ($types) $stmt->bind_param($types, ...$params);
-$stmt->execute();
-$kpi = $stmt->get_result()->fetch_assoc();
+$total  = runQuery($conn, $sqlTotal, $types, $params);
+$rev    = runQuery($conn, $sqlRevenue, $types, $params);
+$avg    = runQuery($conn, $sqlAvg, $types, $params);
+$cancel = runQuery($conn, $sqlCancel, $types, $params);
 
 /* ==============================
-   TOTAL EXPENSE (ใช้ report_date)
-============================== */
-
-$whereExp = [];
-$paramsExp = [];
-$typesExp = "";
-
-if ($region_id !== "") {
-    $whereExp[] = "r.region_id = ?";
-    $paramsExp[] = (int)$region_id;
-    $typesExp .= "i";
-}
-
-if ($province_id !== "") {
-    $whereExp[] = "p.province_id = ?";
-    $paramsExp[] = (int)$province_id;
-    $typesExp .= "i";
-}
-
-if ($branch_id !== "") {
-    $whereExp[] = "b.branch_id = ?";
-    $paramsExp[] = $branch_id;
-    $typesExp .= "s";
-}
-
-if ($range === "7days")
-    $whereExp[] = "ml.report_date >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
-elseif ($range === "30days")
-    $whereExp[] = "ml.report_date >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
-elseif ($range === "1year")
-    $whereExp[] = "ml.report_date >= DATE_SUB(NOW(), INTERVAL 1 YEAR)";
-elseif ($range === "custom" && $start && $end) {
-    $whereExp[] = "DATE(ml.report_date) BETWEEN ? AND ?";
-    $paramsExp[] = $start;
-    $paramsExp[] = $end;
-    $typesExp .= "ss";
-}
-
-$whereExpSQL = count($whereExp) ? "WHERE " . implode(" AND ", $whereExp) : "";
-
-$sqlExpense = "
-SELECT COALESCE(SUM(ml.repair_cost),0) total_expense
-FROM maintenance_logs ml
-JOIN branches b ON ml.branch_id=b.branch_id
-JOIN provinces p ON b.province_id=p.province_id
-JOIN region r ON p.region_id=r.region_id
-$whereExpSQL
-";
-
-$stmtExp = $conn->prepare($sqlExpense);
-if ($typesExp) $stmtExp->bind_param($typesExp, ...$paramsExp);
-$stmtExp->execute();
-$expense = $stmtExp->get_result()->fetch_assoc();
-
-/* ==============================
-   TREND (COUNT + REVENUE)
+   TREND
 ============================== */
 
 $sqlTrend = "
 SELECT 
-    DATE(bk.pickup_time) d,
-    COUNT(*) bookings,
-    COALESCE(SUM(bk.net_amount),0) revenue
+DATE(bk.pickup_time) d,
+COUNT(*) bookings,
+COALESCE(SUM(bk.net_amount),0) revenue
 FROM bookings bk
-JOIN branches b ON bk.branch_id=b.branch_id
-JOIN provinces p ON b.province_id=p.province_id
-JOIN region r ON p.region_id=r.region_id
+$join
 $whereSQL
+" . ($whereSQL ? " AND" : " WHERE") . " bk.booking_status_id = 5
 GROUP BY d
 ORDER BY d
 ";
@@ -168,8 +139,8 @@ if ($types) $stmtTrend->bind_param($types, ...$params);
 $stmtTrend->execute();
 $resTrend = $stmtTrend->get_result();
 
-$labels=[];
-$bookings=[];
+$labels=[]; 
+$bookings=[]; 
 $revenue=[];
 
 while($row=$resTrend->fetch_assoc()){
@@ -179,235 +150,188 @@ while($row=$resTrend->fetch_assoc()){
 }
 
 /* ==============================
-   TOP 5 EQUIPMENT
+   CHANNEL
 ============================== */
 
-$sqlTop = "
-SELECT 
-    em.name,
-    COUNT(bd.booking_id) total
-FROM booking_details bd
-JOIN bookings bk ON bd.booking_id = bk.booking_id
-JOIN equipment_master em ON bd.equipment_id = em.equipment_id
-JOIN branches b ON bk.branch_id = b.branch_id
-JOIN provinces p ON b.province_id = p.province_id
-JOIN region r ON p.region_id = r.region_id
-$whereSQL
-GROUP BY em.name
-ORDER BY total DESC
-LIMIT 5
-";
-
-$stmtTop = $conn->prepare($sqlTop);
-if ($types) $stmtTop->bind_param($types, ...$params);
-$stmtTop->execute();
-$resTop = $stmtTop->get_result();
-
-$topLabels=[];
-$topCounts=[];
-
-while($row=$resTop->fetch_assoc()){
-    $topLabels[] = $row["name"];
-    $topCounts[] = (int)$row["total"];
-}
-
-
-/* ==============================
-   EXPENSE TREND (report_date)
-============================== */
-
-$sqlExpenseTrend = "
-SELECT 
-    DATE(ml.report_date) d,
-    SUM(ml.repair_cost) expense
-FROM maintenance_logs ml
-JOIN branches b ON ml.branch_id=b.branch_id
-JOIN provinces p ON b.province_id=p.province_id
-JOIN region r ON p.region_id=r.region_id
-$whereExpSQL
-GROUP BY d
-ORDER BY d
-";
-
-$stmtExpTrend = $conn->prepare($sqlExpenseTrend);
-if ($typesExp) $stmtExpTrend->bind_param($typesExp, ...$paramsExp);
-$stmtExpTrend->execute();
-$resExpTrend = $stmtExpTrend->get_result();
-
-$expenseMap=[];
-while($row=$resExpTrend->fetch_assoc()){
-    $expenseMap[$row["d"]] = (float)$row["expense"];
-}
-
-$expenseTrend=[];
-foreach($labels as $d){
-    $expenseTrend[] = $expenseMap[$d] ?? 0;
-}
-
-/* ==============================
-   PAYMENT RATIO
-============================== */
-
-$sqlPayment = "
-SELECT pm.name_th, COUNT(*) total
-FROM payments pay
-JOIN payment_methods pm ON pay.method_id = pm.method_id
-JOIN bookings bk ON pay.booking_id = bk.booking_id
-JOIN branches b ON bk.branch_id = b.branch_id
-JOIN provinces p ON b.province_id = p.province_id
-JOIN region r ON p.region_id = r.region_id
-$whereSQL
-GROUP BY pm.name_th
-";
-
-$stmtPay = $conn->prepare($sqlPayment);
-if ($types) $stmtPay->bind_param($types, ...$params);
-$stmtPay->execute();
-$resPay = $stmtPay->get_result();
-
-$payLabels = [];
-$payData = [];
-
-while ($row = $resPay->fetch_assoc()) {
-    $payLabels[] = $row["name_th"];
-    $payData[] = (int)$row["total"];
-}
-
-
-/* ==============================
-   BOOKING TYPE RATIO
-============================== */
-
-$sqlRatio = "
-SELECT bt.name_th, COUNT(*) total
+$sqlChannel = "
+SELECT bt.name_th, SUM(bk.net_amount) revenue
 FROM bookings bk
 JOIN booking_types bt ON bk.booking_type_id = bt.id
-JOIN branches b ON bk.branch_id = b.branch_id
-JOIN provinces p ON b.province_id = p.province_id
-JOIN region r ON p.region_id = r.region_id
+$join
 $whereSQL
+" . ($whereSQL ? " AND" : " WHERE") . " bk.booking_status_id = 5
 GROUP BY bt.name_th
 ";
 
-$stmtRatio = $conn->prepare($sqlRatio);
-if ($types) $stmtRatio->bind_param($types, ...$params);
-$stmtRatio->execute();
-$resRatio = $stmtRatio->get_result();
+$stmtC = $conn->prepare($sqlChannel);
+if ($types) $stmtC->bind_param($types, ...$params);
+$stmtC->execute();
 
-$ratioLabels = [];
-$ratioData = [];
+$channelLabels=[]; 
+$channelData=[];
 
-while ($row = $resRatio->fetch_assoc()) {
-    $ratioLabels[] = $row["name_th"];
-    $ratioData[] = (int)$row["total"];
+$resC = $stmtC->get_result();
+while($row=$resC->fetch_assoc()){
+    $channelLabels[] = $row["name_th"];
+    $channelData[]   = (float)$row["revenue"];
 }
-
-$net_profit = (float)$kpi["total_revenue"] - (float)$expense["total_expense"];
 
 /* ==============================
-   CHANNEL DAILY (Online vs Walk-in)
+   BOOKING RATIO
 ============================== */
 
-$sqlChannelDaily = "
+$sqlRatio = "
 SELECT 
-    DAYOFWEEK(bk.pickup_time) AS day_num,
-    SUM(CASE WHEN bt.name_th = 'ออนไลน์' THEN 1 ELSE 0 END) AS online,
-    SUM(CASE WHEN bt.name_th = 'หน้าร้าน' THEN 1 ELSE 0 END) AS walkin
+CASE 
+    WHEN bk.booking_status_id = 5 THEN 'สำเร็จ'
+    WHEN bk.booking_status_id = 6 THEN 'ยกเลิก'
+END AS status,
+COUNT(*) total
 FROM bookings bk
-JOIN booking_types bt ON bk.booking_type_id = bt.id
-JOIN branches b ON bk.branch_id = b.branch_id
-JOIN provinces p ON b.province_id = p.province_id
-JOIN region r ON p.region_id = r.region_id
+$join
 $whereSQL
-GROUP BY day_num
-ORDER BY FIELD(day_num,2,3,4,5,6,7,1)
+" . ($whereSQL ? " AND" : " WHERE") . " bk.booking_status_id IN (5,6)
+GROUP BY bk.booking_status_id
 ";
 
-$stmtChannel = $conn->prepare($sqlChannelDaily);
-if ($types) $stmtChannel->bind_param($types, ...$params);
-$stmtChannel->execute();
-$resChannel = $stmtChannel->get_result();
+$stmtR = $conn->prepare($sqlRatio);
+if ($types) $stmtR->bind_param($types, ...$params);
+$stmtR->execute();
 
-$channelLabels = [];
-$channelOnline = [];
-$channelWalkin = [];
+$ratioLabels=[]; 
+$ratioData=[];
 
-/* map วัน */
-$days = [
-    2 => "จันทร์",
-    3 => "อังคาร",
-    4 => "พุธ",
-    5 => "พฤหัส",
-    6 => "ศุกร์",
-    7 => "เสาร์",
-    1 => "อาทิตย์"
-];
-
-/* เตรียมค่าเริ่มต้น 0 */
-$onlineMap = [];
-$walkinMap = [];
-
-foreach ($days as $num => $name) {
-    $onlineMap[$num] = 0;
-    $walkinMap[$num] = 0;
+$resR = $stmtR->get_result();
+while($row=$resR->fetch_assoc()){
+    $ratioLabels[] = $row["status"];
+    $ratioData[]   = (int)$row["total"];
 }
 
-/* เติมค่าจาก DB */
-while ($row = $resChannel->fetch_assoc()) {
-    $dayNum = (int)$row["day_num"];
-    $onlineMap[$dayNum] = (int)$row["online"];
-    $walkinMap[$dayNum] = (int)$row["walkin"];
+/* ==============================
+   ALL BRANCHES (สำคัญสุด)
+============================== */
+
+$joinBranch = "
+LEFT JOIN provinces p ON b.province_id = p.province_id
+LEFT JOIN region r ON p.region_id = r.region_id
+";
+
+$whereBranch = [];
+$paramsBranch = [];
+$typesBranch = "";
+
+/* FILTER LOCATION */
+
+if ($region_id !== "") {
+    $whereBranch[] = "r.region_id = ?";
+    $paramsBranch[] = (int)$region_id;
+    $typesBranch .= "i";
 }
 
-/* เรียงตาม จันทร์ → อาทิตย์ */
-$channelLabels = [];
-$channelOnline = [];
-$channelWalkin = [];
-
-foreach ($days as $num => $name) {
-    $channelLabels[] = $name;
-    $channelOnline[] = $onlineMap[$num];
-    $channelWalkin[] = $walkinMap[$num];
+if ($province_id !== "") {
+    $whereBranch[] = "p.province_id = ?";
+    $paramsBranch[] = (int)$province_id;
+    $typesBranch .= "i";
 }
 
+if ($branch_id !== "") {
+    $whereBranch[] = "b.branch_id = ?";
+    $paramsBranch[] = $branch_id;
+    $typesBranch .= "s";
+}
+
+/* ==============================
+   BASE SQL
+============================== */
+
+$sqlBranch = "
+SELECT 
+    b.name,
+    COUNT(bk.booking_id) AS total
+FROM branches b
+LEFT JOIN bookings bk 
+    ON bk.branch_id = b.branch_id
+    AND bk.booking_status_id = 5
+";
+
+/* ==============================
+   👉 ADD DATE FILTER IN JOIN (สำคัญมาก)
+============================== */
+
+if ($range === "7days") {
+    $sqlBranch .= " AND bk.pickup_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+}
+elseif ($range === "30days") {
+    $sqlBranch .= " AND bk.pickup_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+}
+elseif ($range === "1year") {
+    $sqlBranch .= " AND bk.pickup_time >= DATE_SUB(NOW(), INTERVAL 1 YEAR)";
+}
+elseif ($range === "custom" && $start && $end) {
+    $sqlBranch .= " AND DATE(bk.pickup_time) BETWEEN ? AND ?";
+    $paramsBranch[] = $start;
+    $paramsBranch[] = $end;
+    $typesBranch .= "ss";
+}
+
+/* ==============================
+   JOIN + WHERE
+============================== */
+
+$whereSQLBranch = count($whereBranch) ? "WHERE " . implode(" AND ", $whereBranch) : "";
+
+$sqlBranch .= "
+$joinBranch
+$whereSQLBranch
+GROUP BY b.branch_id
+ORDER BY total DESC
+";
+
+/* ==============================
+   EXECUTE
+============================== */
+
+$stmtBranch = $conn->prepare($sqlBranch);
+if ($typesBranch) $stmtBranch->bind_param($typesBranch, ...$paramsBranch);
+$stmtBranch->execute();
+
+$resBranch = $stmtBranch->get_result();
+
+$branchLabels=[]; 
+$branchData=[];
+
+while($row=$resBranch->fetch_assoc()){
+    $branchLabels[] = $row["name"];
+    $branchData[]   = (int)$row["total"];
+}
 /* ==============================
    RESPONSE
 ============================== */
 
 echo json_encode([
     "kpi"=>[
-        "total_bookings"=>(int)$kpi["total_bookings"],
-        "total_revenue"=>(float)$kpi["total_revenue"],
-        "total_expense"=>(float)$expense["total_expense"],
-        "net_profit"=>$net_profit
+        "total_bookings"=>(int)$total["total_bookings"],
+        "total_revenue"=>(float)$rev["total_revenue"],
+        "revenue_per_booking"=>(float)$avg["revenue_per_booking"],
+        "cancellation_rate"=>(float)$cancel["cancellation_rate"]
     ],
     "trend"=>[
         "labels"=>$labels,
         "bookings"=>$bookings,
         "revenue"=>$revenue
     ],
-    "top5"=>[
-        "labels"=>$topLabels,
-        "counts"=>$topCounts
-    ],
-    "profit_trend"=>[
-        "labels"=>$labels,
-        "revenue"=>$revenue,
-        "expense"=>$expenseTrend
-    ],
-    "payment_ratio"=>[
-        "labels"=>$payLabels,
-        "data"=>$payData
+    "channel"=>[
+        "labels"=>$channelLabels,
+        "data"=>$channelData
     ],
     "booking_ratio"=>[
         "labels"=>$ratioLabels,
         "data"=>$ratioData
     ],
-"channel_daily"=>[
-    "labels"=>$channelLabels,
-    "online"=>$channelOnline,
-    "walkin"=>$channelWalkin
-]
+    "branches"=>[
+        "labels"=>$branchLabels,
+        "data"=>$branchData
+    ]
 ]);
 
 } catch (Throwable $e) {

@@ -11,10 +11,11 @@
 </head>
 
 <body>
+
+	<!-- HEADER -->
 	<header class="main-header">
 
 		<div class="header-top">
-
 			<div class="brand">
 				<span class="brand-name">ระบบเช่าอุปกรณ์กีฬา</span>
 				<small>Sports Equipment Rental System</small>
@@ -23,21 +24,21 @@
 			<div class="staff-zone">
 				<a href="profile.html" class="profile-btn">👤 โปรไฟล์</a>
 			</div>
-
 		</div>
 
 		<div class="header-bottom">
 			<nav class="main-nav">
-				<a href="index.html" class="nav-item active">ภาพรวมอุปกรณ์</a>
+				<a href="index.html" class="nav-item active">Dashboard</a>
 				<a href="user.html" class="nav-item">ผู้ใช้</a>
-				<a href="equipment_dashboard.html" class="nav-item">สถานะอุปกรณ์</a>
+				<a href="equipment_dashboard.html" class="nav-item">อุปกรณ์</a>
 			</nav>
 		</div>
+
 	</header>
 
 	<div class="container">
 
-		<!-- ================= SIDEBAR FILTER ================= -->
+		<!-- SIDEBAR -->
 		<aside class="sidebar">
 
 			<h3>ตัวกรองข้อมูล</h3>
@@ -50,7 +51,7 @@
 				<option value="custom">กำหนดเอง</option>
 			</select>
 
-			<div id="customDateBox" class="custom-date">
+			<div id="customDateBox" class="custom-date" style="display:none;">
 				<input type="date" id="startDate">
 				<input type="date" id="endDate">
 			</div>
@@ -70,99 +71,83 @@
 				<option value="">ทั้งหมด</option>
 			</select>
 
-			<label>รูปแบบการเช่า</label>
-			<select id="bookingTypeSelect">
-				<option value="">ทั้งหมด</option>
-				<option value="1">ออนไลน์</option>
-				<option value="2">หน้าร้าน</option>
-			</select>
-
-			<button id="resetFilter" class="btn-reset">
-				รีเซ็ตตัวกรอง
-			</button>
+			<button id="resetFilter" class="btn-reset">รีเซ็ตตัวกรอง</button>
 
 		</aside>
 
-		<!-- ================= MAIN ================= -->
+
+		<!-- MAIN -->
 		<main class="main">
 
-			<!-- ================= ROW 1 : KPI ================= -->
+			<!-- KPI -->
 			<section class="kpi-grid">
+
 				<div class="kpi-card">
-					<div class="kpi-title">การจองทั้งหมด</div>
+					<div class="kpi-title">จำนวนการจอง</div>
 					<div class="kpi-value" id="kpiBookings">-</div>
 				</div>
 
 				<div class="kpi-card">
-					<div class="kpi-title">รายได้สุทธิ</div>
+					<div class="kpi-title">รายได้รวม</div>
 					<div class="kpi-value" id="kpiRevenue">-</div>
 				</div>
 
 				<div class="kpi-card">
-					<div class="kpi-title">ค่าใช้จ่ายรวม</div>
-					<div class="kpi-value" id="kpiExpense">-</div>
+					<div class="kpi-title">อัตราการยกเลิก</div>
+					<div class="kpi-value" id="kpiCancel">-</div>
 				</div>
 
 				<div class="kpi-card">
-					<div class="kpi-title">กำไรสุทธิ</div>
-					<div class="kpi-value" id="kpiProfit">-</div>
+					<div class="kpi-title">รายได้ต่อการจอง</div>
+					<div class="kpi-value" id="kpiAvg">-</div>
 				</div>
 
 			</section>
 
 
-			<!-- ================= ROW 2 : PIE ================= -->
+			<!-- 🔥 TREND แยก 2 กราฟ -->
 			<section class="grid-2">
+
 				<div class="card">
-					<h3>สัดส่วนการชำระเงิน</h3>
-					<canvas id="paymentChart"></canvas>
+					<h3>แนวโน้มการจอง</h3>
+					<canvas id="bookingTrendChart"></canvas>
 				</div>
 
 				<div class="card">
-					<h3>Online vs Walk-in</h3>
+					<h3>แนวโน้มรายได้</h3>
+					<canvas id="revenueTrendChart"></canvas>
+				</div>
+
+			</section>
+
+
+			<!-- CHANNEL + STATUS -->
+			<section class="grid-2">
+
+				<div class="card">
+					<h3>รายได้ตามช่องทาง</h3>
+					<canvas id="channelChart"></canvas>
+				</div>
+
+				<div class="card">
+					<h3>สถานะการจอง</h3>
 					<canvas id="bookingRatioChart"></canvas>
 				</div>
-			</section>
-
-			<!-- ================= ROW 3 : OPERATIONS ================= -->
-			<section class="grid-2 big-operations">
-
-				<div class="card">
-					<h3>อุปกรณ์ยอดนิยม Top 5</h3>
-					<canvas id="topChart"></canvas>
-				</div>
-
-				<div class="card">
-					<h3>การเช่าตามช่องทาง (รายวัน)</h3>
-					<canvas id="channelChart"></canvas>
-
-					<div class="avg-box">
-						<div>เว็บไซต์ <span id="avgOnline"></span></div>
-						<div>เคาน์เตอร์ <span id="avgWalkin"></span></div>
-					</div>
-				</div>
 
 			</section>
 
-			<!-- ================= ROW 4 : TREND ================= -->
+
+			<!-- TOP 5 -->
 			<section class="card">
-				<h3>แนวโน้มการจอง & รายได้</h3>
-				<canvas id="trendChart"></canvas>
-			</section>
-
-			<!-- ================= ROW 5 : FINANCIAL ================= -->
-			<section class="card">
-				<h3>รายได้ vs ค่าใช้จ่าย</h3>
-				<canvas id="profitChart"></canvas>
+				<h3>จำนวนครั้งการจองแต่ละสาขา</h3>
+				<canvas id="topChart"></canvas>
 			</section>
 
 		</main>
-
 
 	</div>
 
 	<script src="index.js"></script>
 
 </body>
-
 </html>

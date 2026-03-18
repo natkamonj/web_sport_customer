@@ -131,8 +131,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
             <div class="arrow">›</div>
           `;
-
-          // ✅ SELECT BRANCH
           card.addEventListener("click", async () => {
 
             const res = await fetch(
@@ -176,7 +174,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (e.target.name === "province") {
-      loadProvinces(e.target.value);
       loadBranches();
     }
 
