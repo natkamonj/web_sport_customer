@@ -142,12 +142,25 @@ function renderTopEquipment(data) {
                 }],
         },
         options: {
+            responsive: true,
+            maintainAspectRatio: false,
             plugins: {
-                legend: { display: false }
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) { return " \u0E08\u0E33\u0E19\u0E27\u0E19: ".concat(context.raw, " \u0E04\u0E23\u0E31\u0E49\u0E07"); }
+                    }
+                }
             },
             scales: {
                 y: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0,
+                        callback: function (value) {
+                            return value + " ครั้ง";
+                        }
+                    }
                 }
             }
         },
@@ -169,12 +182,27 @@ function renderTopVenue(data) {
                 }],
         },
         options: {
+            responsive: true,
+            maintainAspectRatio: false,
             plugins: {
-                legend: { display: false }
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) { return " \u0E08\u0E33\u0E19\u0E27\u0E19: ".concat(context.raw, " \u0E04\u0E23\u0E31\u0E49\u0E07"); }
+                    }
+                }
             },
             scales: {
                 y: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0,
+                        callback: function (value) {
+                            if (Math.floor(value) === value) {
+                                return value + " ครั้ง";
+                            }
+                        }
+                    }
                 }
             }
         },
@@ -188,11 +216,22 @@ function renderCategoryFaculty(data) {
     if (labels.length === 0)
         return;
     var vibrantPalette = [
-        '#f97316', '#3b82f6', '#22c55e', '#a855f7', '#ef4444',
-        '#06b6d4', '#eab308', '#ec4899', '#14b8a6', '#6366f1',
-        '#84cc16', '#f43f5e', '#0ea5e9', '#8b5cf6'
+        '#f97316',
+        '#3b82f6',
+        '#22c55e',
+        '#a855f7',
+        '#ef4444',
+        '#06b6d4',
+        '#eab308',
+        '#ec4899',
+        '#14b8a6',
+        '#6366f1',
+        '#84cc16',
+        '#f43f5e',
+        '#0ea5e9',
+        '#8b5cf6'
     ];
-    var styledDatasets = datasets.map(function (ds, index) { return (__assign(__assign({}, ds), { backgroundColor: vibrantPalette[index % vibrantPalette.length], borderColor: vibrantPalette[index % vibrantPalette.length], borderWidth: 1, barPercentage: 0.5, categoryPercentage: 0.8, borderRadius: 2 })); });
+    var styledDatasets = datasets.map(function (ds, index) { return (__assign(__assign({}, ds), { backgroundColor: vibrantPalette[index % vibrantPalette.length], borderWidth: 0, barPercentage: 0.6, categoryPercentage: 0.8 })); });
     renderChart("categoryFacultyChart", {
         type: "bar",
         data: {
@@ -203,22 +242,21 @@ function renderCategoryFaculty(data) {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    position: "bottom",
-                    labels: { usePointStyle: true, font: { size: 10 } }
-                },
+                legend: { position: "bottom" },
                 tooltip: { mode: 'index', intersect: false }
             },
             scales: {
                 x: {
-                    stacked: false,
-                    grid: { display: false },
-                    ticks: { font: { size: 10 }, maxRotation: 45, minRotation: 45 }
+                    stacked: true,
+                    grid: { display: false }
                 },
                 y: {
+                    stacked: true,
                     beginAtZero: true,
-                    grid: { color: 'rgba(0,0,0,0.05)' },
-                    ticks: { precision: 0 }
+                    ticks: {
+                        stepSize: 1,
+                        callback: function (value) { return value + " คน"; }
+                    }
                 },
             },
         },
@@ -279,12 +317,12 @@ function initFilters() {
                     fillSelect("facultySelect", data.faculties);
                     fillSelect("categorySelect", data.categories);
                     years = [
-                        { id: "1", name: "ปีที่ 1" },
-                        { id: "2", name: "ปีที่ 2" },
-                        { id: "3", name: "ปีที่ 3" },
-                        { id: "4", name: "ปีที่ 4" },
-                        { id: "5", name: "ปีที่ 5" },
-                        { id: "6", name: "ปีที่ 6" }
+                        { id: "1", name: "ปี 1" },
+                        { id: "2", name: "ปี 2" },
+                        { id: "3", name: "ปี 3" },
+                        { id: "4", name: "ปี 4" },
+                        { id: "5", name: "ปี 5" },
+                        { id: "6", name: "ปี 6" }
                     ];
                     fillSelect("yearSelect", years);
                     return [3 /*break*/, 4];

@@ -134,7 +134,36 @@ async function loadDashboard() {
 					tension: 0.4
 				}]
 			},
-			options: { responsive: true, maintainAspectRatio: false }
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				scales: {
+					y: {
+						beginAtZero: true,
+						ticks: {
+							callback: function (value) {
+								return value.toLocaleString() + " รายการ";
+							}
+						}
+					}
+				},
+				plugins: {
+					tooltip: {
+						callbacks: {
+							label: function (context) {
+								let label = context.dataset.label || '';
+								if (label) {
+									label += ': ';
+								}
+								if (context.parsed.y !== null) {
+									label += context.parsed.y.toLocaleString() + " รายการ";
+								}
+								return label;
+							}
+						}
+					}
+				}
+			}
 		});
 
 		// 3. กราฟสัดส่วน Online vs Walk-in
@@ -144,18 +173,36 @@ async function loadDashboard() {
 				labels: ["Online", "Walk-in"],
 				datasets: [{
 					data: [data.charts.source.online, data.charts.source.walkin],
-					backgroundColor: ["#43a43b", "#3d74c1"]
+					backgroundColor: ["#43a43b", "#3d74c1"],
+					borderWidth: 0
 				}]
 			},
 			options: {
-				plugins: { legend: { position: 'bottom' } },
 				cutout: '70%',
 				responsive: true,
-				maintainAspectRatio: false
+				maintainAspectRatio: false,
+				plugins: {
+					legend: {
+						position: 'bottom',
+						labels: {
+							usePointStyle: true, 
+							padding: 20,
+							font: { size: 12 }
+						}
+					},
+					tooltip: {
+						callbacks: {
+							label: function (context) {
+								let label = context.label || '';
+								let value = context.raw || 0;
+								return ` ${label}: ${value} รายการ`;
+							}
+						}
+					}
+				}
 			}
 		});
 
-		// 4. วาดกราฟแท่ง Peak Time (ใช้ข้อมูลจาก heatmap มารวมกัน)
 		if (data.charts && data.charts.heatmap) {
 			renderPeakBarChart(data.charts.heatmap);
 		}
@@ -186,7 +233,7 @@ function renderChart(id, config) {
 
 /* ================= ฟังก์ชันสำหรับกราฟแท่ง Peak Time ================= */
 function renderPeakBarChart(heatData) {
-	const hours = Array.from({ length: 14 }, (_, i) => i + 8);
+	const hours = Array.from({ length: 13 }, (_, i) => i + 8);
 
 	const hourlyTotals = hours.map(h => {
 		let total = 0;
@@ -199,9 +246,9 @@ function renderPeakBarChart(heatData) {
 	});
 
 	const backgroundColors = hours.map(h => {
-		if (h <= 12) return '#ec5b75'; 
-		if (h <= 17) return '#bf2bff'; 
-		return '#ea2323'; 
+		if (h <= 12) return '#ec5b75';
+		if (h <= 17) return '#bf2bff';
+		return '#ea2323';
 	});
 
 	renderChart("peakHourBarChart", {
@@ -222,7 +269,15 @@ function renderPeakBarChart(heatData) {
 				legend: { display: false }
 			},
 			scales: {
-				y: { beginAtZero: true, ticks: { precision: 0 } }
+				y: {
+					beginAtZero: true,
+					ticks: {
+						precision: 0,
+						callback: function (value) {
+							return value + " รายการ";
+						}
+					}
+				}
 			}
 		}
 	});

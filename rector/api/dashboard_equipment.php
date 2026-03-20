@@ -28,11 +28,32 @@ $endDate     = $_GET['endDate'] ?? '';
 $whereClauses = ["b.branch_id = '$branchId'"];
 
 if ($bookingType !== '') $whereClauses[] = "b.booking_type_id = " . intval($bookingType);
-if ($userType !== '')    $whereClauses[] = "c.customer_type = '" . $conn->real_escape_string($userType) . "'";
-if ($facultyId !== '')   $whereClauses[] = "c.faculty_id = " . intval($facultyId);
-if ($year !== '')        $whereClauses[] = "c.study_year = " . intval($year);
-if ($categoryId !== '') {$whereClauses[] = "(e.category_id = " . intval($categoryId) . " OR v.category_id = " . intval($categoryId) . ")";
+if ($userType !== '') {
+    if ($userType === 'student') {
+        $whereClauses[] = "c.customer_type = 'student' AND c.branch_id = b.branch_id";
+    } elseif ($userType === 'general') {
+        $whereClauses[] = "c.customer_type = 'general' AND c.branch_id = b.branch_id";
+    } elseif ($userType === 'external') {
+        $whereClauses[] = "(c.branch_id != b.branch_id OR c.branch_id IS NULL)";
+    }
 }
+if ($facultyId !== '') {
+    $whereClauses[] = "c.faculty_id = " . intval($facultyId);
+    $whereClauses[] = "c.customer_type = 'student'";
+    $whereClauses[] = "c.branch_id = '$branchId'"; 
+}
+
+if ($year !== '') {
+    $whereClauses[] = "c.study_year = " . intval($year);
+    $whereClauses[] = "c.customer_type = 'student'";
+    $whereClauses[] = "c.branch_id = '$branchId'";
+}
+$categoryCondition = "";
+if ($categoryId !== '') {
+    $categoryCondition = " AND (e.category_id = " . intval($categoryId) . " OR v.category_id = " . intval($categoryId) . ")";
+}
+
+$whereSql = "WHERE " . implode(" AND ", $whereClauses);
 
 if ($range === '7days') {
     $whereClauses[] = "b.pickup_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
@@ -46,18 +67,21 @@ if ($range === '7days') {
 
 $whereSql = "WHERE " . implode(" AND ", $whereClauses);
 
-// --- 1. KPI: จำนวนอุปกรณ์ (Join เพื่อเช็คสาขา) ---
+// --- 1. KPI: จำนวนอุปกรณ์ ---
 $totalEqRes = $conn->query("
     SELECT COUNT(ei.instance_code) as total 
-    FROM equipment_master em
-    JOIN equipment_instances ei ON em.equipment_id = ei.equipment_id
-    WHERE ei.branch_id = '$branchId' " . ($categoryId !== '' ? " AND em.category_id = " . intval($categoryId) : "")
+    FROM equipment_instances ei
+    JOIN equipment_master em ON ei.equipment_id = em.equipment_id
+    WHERE ei.branch_id = '$branchId' 
+    " . ($categoryId !== '' ? " AND em.category_id = " . intval($categoryId) : "")
 );
 $totalEq = ($totalEqRes) ? $totalEqRes->fetch_assoc()['total'] : 0;
 
 $totalVnRes = $conn->query("
-    SELECT COUNT(*) as total FROM venues v 
-    WHERE v.branch_id = '$branchId' " . ($categoryId !== '' ? " AND v.category_id = " . intval($categoryId) : "")
+    SELECT COUNT(*) as total 
+    FROM venues v 
+    WHERE v.branch_id = '$branchId' 
+    " . ($categoryId !== '' ? " AND v.category_id = " . intval($categoryId) : "")
 );
 $totalVn = ($totalVnRes) ? $totalVnRes->fetch_assoc()['total'] : 0;
 
@@ -71,7 +95,8 @@ $utilRes = $conn->query("
     JOIN customers c ON b.customer_id = c.customer_id
     LEFT JOIN equipment_master e ON bd.equipment_id = e.equipment_id
     LEFT JOIN venues v ON bd.venue_id = v.venue_id
-    $whereSql
+    $whereSql 
+    $categoryCondition 
 ")->fetch_assoc();
 
 $eqUtilRate = ($totalEq > 0) ? ($utilRes['used_eq'] / $totalEq) * 100 : 0;
@@ -83,9 +108,12 @@ $topEqRes = $conn->query("
     SELECT e.name, COUNT(bd.detail_id) as usage_count
     FROM booking_details bd
     JOIN bookings b ON bd.booking_id = b.booking_id
-    JOIN equipment_master e ON bd.equipment_id = e.equipment_id
     JOIN customers c ON b.customer_id = c.customer_id
-    $whereSql AND bd.equipment_id IS NOT NULL
+    JOIN equipment_master e ON bd.equipment_id = e.equipment_id 
+    LEFT JOIN venues v ON bd.venue_id = v.venue_id
+    $whereSql 
+    $categoryCondition 
+    AND bd.equipment_id IS NOT NULL
     GROUP BY e.equipment_id 
     ORDER BY usage_count DESC LIMIT 5
 ");
@@ -100,9 +128,12 @@ $topVnRes = $conn->query("
     SELECT v.name, COUNT(bd.detail_id) as usage_count
     FROM booking_details bd
     JOIN bookings b ON bd.booking_id = b.booking_id
-    JOIN venues v ON bd.venue_id = v.venue_id
     JOIN customers c ON b.customer_id = c.customer_id
-    $whereSql AND bd.venue_id IS NOT NULL
+    JOIN venues v ON bd.venue_id = v.venue_id 
+    LEFT JOIN equipment_master e ON bd.equipment_id = e.equipment_id 
+    $whereSql 
+    $categoryCondition
+    AND bd.venue_id IS NOT NULL
     GROUP BY v.venue_id 
     ORDER BY usage_count DESC LIMIT 5
 ");
@@ -139,6 +170,8 @@ $catDataRes = $conn->query("
     FROM bookings b
     JOIN booking_details bd ON b.booking_id = bd.booking_id
     JOIN customers c ON b.customer_id = c.customer_id
+    AND c.customer_type = 'student' 
+    AND c.branch_id = b.branch_id 
     LEFT JOIN equipment_master e ON bd.equipment_id = e.equipment_id
     LEFT JOIN venues v ON bd.venue_id = v.venue_id
     JOIN categories cat ON (COALESCE(e.category_id, v.category_id) = cat.category_id)

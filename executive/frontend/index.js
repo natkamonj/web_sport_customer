@@ -14,8 +14,9 @@ var revenueTrendChart;
 var channelChart;
 var bookingRatioChart;
 var branchChart;
+var overviewChart;
 /* ==============================
-   INIT
+     INIT
 ============================== */
 document.addEventListener("DOMContentLoaded", function () {
     initCharts();
@@ -26,7 +27,7 @@ document.addEventListener("DOMContentLoaded", function () {
     loadAll();
 });
 /* ==============================
-   FILTER EVENTS
+     FILTER EVENTS
 ============================== */
 function bindFilters() {
     var _a;
@@ -51,7 +52,7 @@ function bindFilters() {
     (_a = document.getElementById("resetFilter")) === null || _a === void 0 ? void 0 : _a.addEventListener("click", resetFilter);
 }
 /* ==============================
-   FILTER LOGIC
+     FILTER LOGIC
 ============================== */
 function getFilter() {
     var _a, _b, _c, _d, _e, _f;
@@ -70,7 +71,7 @@ function toggleCustomDate() {
     box.style.display = range === "custom" ? "block" : "none";
 }
 function resetFilter() {
-    document.getElementById("rangeSelect").value = "30days";
+    document.getElementById("rangeSelect").value = "";
     document.getElementById("regionSelect").value = "";
     document.getElementById("provinceSelect").value = "";
     document.getElementById("branchSelect").value = "";
@@ -79,7 +80,7 @@ function resetFilter() {
     loadAll();
 }
 /* ==============================
-   LOAD DASHBOARD
+     LOAD DASHBOARD
 ============================== */
 function loadAll() {
     fetch("/sports_rental_system/executive/api/dashboard_summarys.php", {
@@ -90,8 +91,9 @@ function loadAll() {
         .then(function (res) { return res.json(); })
         .then(function (result) {
         updateKPI(result.kpi);
-        updateBookingTrend(result.trend);
-        updateRevenueTrend(result.trend);
+        updateOverview(result.trend_finance);
+        updateBookingTrend(result.trend_booking);
+        updateRevenueTrend(result.trend_revenue);
         updateChannel(result.channel);
         updateBookingRatio(result.booking_ratio);
         updateBranches(result.branches);
@@ -99,7 +101,7 @@ function loadAll() {
         .catch(function (err) { return console.error("โหลด Dashboard ไม่สำเร็จ", err); });
 }
 /* ==============================
-   KPI
+     KPI
 ============================== */
 function updateKPI(kpi) {
     var _a, _b, _c, _d;
@@ -114,22 +116,29 @@ function updateKPI(kpi) {
         Number((_d = kpi === null || kpi === void 0 ? void 0 : kpi.cancellation_rate) !== null && _d !== void 0 ? _d : 0).toFixed(2) + " %";
 }
 /* ==============================
-   UPDATE CHARTS
+     UPDATE CHARTS
 ============================== */
 function updateBookingTrend(data) {
     bookingTrendChart.data.labels = (data === null || data === void 0 ? void 0 : data.labels) || [];
-    bookingTrendChart.data.datasets[0].data = (data === null || data === void 0 ? void 0 : data.bookings) || [];
+    bookingTrendChart.data.datasets[0].data = (data === null || data === void 0 ? void 0 : data.data) || []; // ✅
     bookingTrendChart.update();
 }
 function updateRevenueTrend(data) {
     revenueTrendChart.data.labels = (data === null || data === void 0 ? void 0 : data.labels) || [];
-    revenueTrendChart.data.datasets[0].data = (data === null || data === void 0 ? void 0 : data.revenue) || [];
+    revenueTrendChart.data.datasets[0].data = (data === null || data === void 0 ? void 0 : data.data) || []; // ✅
     revenueTrendChart.update();
 }
 function updateChannel(data) {
     channelChart.data.labels = (data === null || data === void 0 ? void 0 : data.labels) || [];
     channelChart.data.datasets[0].data = (data === null || data === void 0 ? void 0 : data.data) || [];
     channelChart.update();
+}
+function updateOverview(data) {
+    overviewChart.data.labels = (data === null || data === void 0 ? void 0 : data.labels) || [];
+    overviewChart.data.datasets[0].data = (data === null || data === void 0 ? void 0 : data.revenue) || [];
+    overviewChart.data.datasets[1].data = (data === null || data === void 0 ? void 0 : data.expense) || []; // 🔥 ต้องมีจาก backend
+    overviewChart.data.datasets[2].data = (data === null || data === void 0 ? void 0 : data.profit) || [];
+    overviewChart.update();
 }
 function updateBookingRatio(data) {
     var labels = (data === null || data === void 0 ? void 0 : data.labels) || [];
@@ -152,7 +161,7 @@ function updateBranches(data) {
     branchChart.update();
 }
 /* ==============================
-   DROPDOWNS
+     DROPDOWNS
 ============================== */
 function loadRegions() {
     fetch("/sports_rental_system/executive/api/get_regions.php")
@@ -230,6 +239,46 @@ function initCharts() {
             }
         }
     };
+    overviewChart = new Chart(document.getElementById("overviewChart"), {
+        type: "line",
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: "รายได้",
+                    data: [],
+                    borderColor: "#22c55e",
+                    backgroundColor: "rgba(34,197,94,0.1)",
+                    tension: 0.4
+                },
+                {
+                    label: "ค่าใช้จ่าย",
+                    data: [],
+                    borderColor: "#ef4444",
+                    backgroundColor: "rgba(239,68,68,0.1)",
+                    tension: 0.4
+                },
+                {
+                    label: "กำไรสุทธิ",
+                    data: [],
+                    borderColor: "#8b5cf6",
+                    backgroundColor: "rgba(139,92,246,0.1)",
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    ticks: {
+                        callback: function (v) { return v.toLocaleString() + " บาท"; }
+                    }
+                }
+            }
+        }
+    });
     // 📊 BOOKING TREND
     bookingTrendChart = new Chart(document.getElementById("bookingTrendChart"), {
         type: "line",

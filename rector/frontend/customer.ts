@@ -58,6 +58,25 @@ function initFilterEvents() {
 		"facultySelect", "yearSelect", "genderSelect", "startDate", "endDate"
 	];
 
+	const userTypeEl = document.getElementById("userTypeSelect");
+	if (userTypeEl) {
+		userTypeEl.addEventListener("change", function () {
+			const facultyEl = document.getElementById("facultySelect");
+			const yearEl = document.getElementById("yearSelect");
+
+			const isNotStudent = this.value === "general" || this.value === "external";
+
+			if (facultyEl) {
+				facultyEl.disabled = isNotStudent;
+				if (isNotStudent) facultyEl.value = "";
+			}
+			if (yearEl) {
+				yearEl.disabled = isNotStudent;
+				if (isNotStudent) yearEl.value = "";
+			}
+		});
+	}
+
 	filterIds.forEach(id => {
 		const el = document.getElementById(id);
 		if (el) {
@@ -143,15 +162,37 @@ async function loadDashboard() {
 		renderChart("trendUsersChart", {
 			type: "line",
 			data: {
-				labels: chartsData.trend?.labels ?? [],
+				labels: (chartsData.trend?.labels ?? []).map(label => {
+					const date = new Date(label + "-01");
+					return date.toLocaleString('en-US', { month: 'short' });
+				}),
 				datasets: [{
 					label: "จำนวนผู้เข้าใช้งาน (คน)",
 					data: chartsData.trend?.data ?? [],
 					borderColor: "#339af0",
 					backgroundColor: "rgba(51, 154, 240, 0.1)",
 					fill: true,
-					tension: 0.3
+					tension: 0,
+					cubicInterpolationMode: 'monotone'
 				}]
+			},
+			options: {
+				animation: false,
+				responsive: true,
+				maintainAspectRatio: false,
+				scales: {
+					y: {
+						beginAtZero: true,
+						min: 0,
+						ticks: {
+							stepSize: 1,
+							precision: 0,
+							callback: function (value) {
+								return value.toLocaleString() + " คน";
+							}
+						}
+					}
+				}
 			}
 		});
 
@@ -163,26 +204,78 @@ async function loadDashboard() {
 				datasets: [{
 					label: "จำนวนนิสิต (คน)",
 					data: chartsData.top_faculty?.data ?? [],
-					backgroundColor: "#51cf66"
+					backgroundColor: "#51cf66",
+					barThickness: 25,
+					maxBarThickness: 30,
+					categoryPercentage: 0.8
 				}]
 			},
 			options: {
 				indexAxis: "y",
-				plugins: { legend: { display: false } }
+				responsive: true,
+				maintainAspectRatio: false,
+				plugins: {
+					legend: { display: false }
+				},
+				scales: {
+					x: {
+						beginAtZero: true,
+						suggestedMax: 1,
+						ticks: {
+							stepSize: 1,
+							precision: 0,
+							callback: function (value) {
+								return value + " คน";
+							}
+						}
+					},
+					y: {
+						ticks: {
+							padding: 10,
+							font: { size: 12 }
+						}
+					}
+				}
 			}
 		});
 
-		// 3. สัดส่วนเพศ
+		// --- 3. สัดส่วนเพศ ---
+		const genderLabels = chartsData.gender?.labels ?? [];
+		const genderColors = genderLabels.map(label => {
+			const cleanLabel = label.trim();
+
+			if (cleanLabel === 'ชาย') return "#4dabf7";   
+			if (cleanLabel === 'หญิง') return "#ff69b4";  
+
+			return "#adb5bd"; 
+		});
+
 		renderChart("genderChart", {
 			type: "doughnut",
 			data: {
-				labels: chartsData.gender?.labels ?? [],
+				labels: genderLabels,
 				datasets: [{
 					data: chartsData.gender?.data ?? [],
-					backgroundColor: ["#4dabf7", "#ff69b4", "#adb5bd"]
+					backgroundColor: genderColors
 				}]
 			},
-			options: { plugins: { legend: { position: 'bottom' } } }
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				cutout: '70%',
+				plugins: {
+					legend: { position: 'bottom' },
+					tooltip: {
+						callbacks: {
+							label: function (context) {
+								let label = context.label || '';
+								let value = context.raw || 0;
+								return ` ${label}: ${value} คน`;
+							}
+						}
+					}
+				}
+			}
 		});
 
 		// 4. สถิติตามชั้นปี
@@ -195,6 +288,34 @@ async function loadDashboard() {
 					data: chartsData.year?.data ?? [],
 					backgroundColor: "#ff922b"
 				}]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				scales: {
+					y: {
+						beginAtZero: true,
+						ticks: {
+							stepSize: 1,
+							precision: 0,
+							callback: function (value) {
+								return value.toLocaleString() + " คน";
+							}
+						}
+					}
+				},
+				plugins: {
+					legend: {
+						display: false
+					},
+					tooltip: {
+						callbacks: {
+							label: function (context) {
+								return `จำนวน: ${context.parsed.y.toLocaleString()} คน`;
+							}
+						}
+					}
+				}
 			}
 		});
 
@@ -205,15 +326,15 @@ async function loadDashboard() {
 
 /* ================= HELPERS ================= */
 function updateKpiUI(id, value, unit) {
-    const el = document.getElementById(id);
-    if (el) {
-        const num = Number(value ?? 0); 
-        const isPercent = ["kpiPenetration", "kpiGeneral", "kpiExternal"].includes(id);
-        
-        el.innerText = isPercent
-            ? num.toFixed(1) + unit
-            : num.toLocaleString() + unit;
-    }
+	const el = document.getElementById(id);
+	if (el) {
+		const num = Number(value ?? 0);
+		const isPercent = ["kpiPenetration", "kpiGeneral", "kpiExternal"].includes(id);
+
+		el.innerText = isPercent
+			? num.toFixed(1) + unit
+			: num.toLocaleString() + unit;
+	}
 }
 
 function renderChart(id, config) {

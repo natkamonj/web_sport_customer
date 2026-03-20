@@ -93,7 +93,7 @@ function toggleCustomDate(): void {
 
 function resetFilter(): void {
 
-	(document.getElementById("rangeSelect") as any).value = "30days";
+	(document.getElementById("rangeSelect") as any).value = "";
 	(document.getElementById("regionSelect") as any).value = "";
 	(document.getElementById("provinceSelect") as any).value = "";
 	(document.getElementById("branchSelect") as any).value = "";
@@ -224,7 +224,12 @@ function updateRevenueTrend(data: any): void {
 function updateChannel(data: any): void {
 	if (!channelChart) return;
 
-	const labels = data?.labels?.length ? data.labels : ["ไม่มีข้อมูล"];
+		const labelMap: any = {
+		general: "บุคคลทั่วไป",
+		student: "นิสิต/นักศึกษา"
+	};
+
+	const labels = (data?.labels || []).map((l: string) => labelMap[l] || l);
 	const values = data?.data?.length ? data.data : [0];
 
 	const maxY = getNiceMax(values);
@@ -236,6 +241,8 @@ function updateChannel(data: any): void {
 	channelChart.data.datasets[0].data = values;
 
 	channelChart.update();
+
+
 }
 
 function updateBookingTrend(data: any): void {
@@ -265,6 +272,8 @@ function updateBookingRatio(data: any): void {
 
 	bookingRatioChart.update();
 }
+
+
 function updateBranches(data: any): void {
 	if (!branchChart) return;
 
@@ -355,14 +364,31 @@ function loadBranches(): Promise<void> {
 }
 
 /* ============================== INIT CHART */
-
 function initCharts(): void {
 
 	const baseOptions = (unit: string = "") => ({
 		responsive: true,
 		maintainAspectRatio: false,
 		plugins: {
-			legend: { position: "bottom" }
+			legend: { position: "bottom" },
+			tooltip: {
+				backgroundColor: "#111827",
+				titleColor: "#ffffff",
+				bodyColor: "#e5e7eb",
+				padding: 10,
+				displayColors: false,
+
+				callbacks: {
+					title: function (context: any) {
+						return context[0].label || "";
+					},
+					label: function (context: any) {
+						const label = context.dataset.label || "";
+						const value = context.raw || 0;
+						return `${label}: ${value.toLocaleString()}${unit ? " " + unit : ""}`;
+					}
+				}
+			}
 		},
 		scales: {
 			y: {
@@ -370,108 +396,44 @@ function initCharts(): void {
 				ticks: {
 					stepSize: 1,
 					precision: 0,
-					callback: (v: any) => (v % 1 === 0 ? v + " " + unit : "")
+					callback: (v: any) =>
+						v % 1 === 0 ? v.toLocaleString() + (unit ? " " + unit : "") : ""
 				}
 			}
 		}
 	});
 
+	// 🟢 แนวโน้มลูกค้า
 	bookingTrendChart = new Chart(document.getElementById("bookingTrendChart"), {
 		type: "doughnut",
-		data: { labels: [], datasets: [{ data: [], backgroundColor: ["#00ff5e", "#0062ff"] }] }
-	});
-
-	revenueTrendChart = new Chart(document.getElementById("revenueTrendChart"), {
-		type: "bar",
 		data: {
-			labels: [],
+			labels: ["ลูกค้าใหม่", "ลูกค้าเดิม"],
 			datasets: [{
-				label: "จำนวนลูกค้า (ตามระดับการใช้งาน)",
 				data: [],
-				backgroundColor: [
-					"#b0cdff", // ใช้งานน้อย
-					"#4588fb", // ปานกลาง
-					"#005bf9"  // สูง
-				],
+				backgroundColor: ["#00ff5e", "#0062ff"]
 			}]
 		},
 		options: {
 			responsive: true,
 			maintainAspectRatio: false,
 			plugins: {
-				legend: {
-					display: false
-				},
+				legend: { position: "bottom" },
 				tooltip: {
-					callbacks: {
-						label: function (context: any) {
-							let value = context.raw || 0;
-							return value.toLocaleString() + " คน";
-						}
-					}
-				}
-			},
-			scales: {
-				y: {
-					min: 0,
-					ticks: {
-						stepSize: 1,
-						callback: (v: any) => v + " คน"
-					}
-				},
-				x: {
-					ticks: {
-						font: {
-							size: 12
-						}
-					}
-				}
-			}
-		}
-	});
-
-	channelChart = new Chart(document.getElementById("channelChart"), {
-		type: "bar",
-		data: {
-			labels: [],
-			datasets: [{
-				label: "รายได้",
-				data: [],
-				backgroundColor: ["#f700ff", "#00ff1e"]
-			}]
-		},
-		options: baseOptions("บาท")
-	});
-
-	bookingRatioChart = new Chart(document.getElementById("bookingRatioChart"), {
-		type: "doughnut",
-		data: {
-			labels: ["บุคคลทั่วไป", "นิสิต/นักศึกษา"], // 🔥 label ชัด
-			datasets: [{
-				data: [],
-				backgroundColor: [
-					"#3b82f6", // บุคคลทั่วไป (น้ำเงิน)
-					"#22c55e"  // นิสิต/นักศึกษา (เขียว)
-				]
-			}]
-		},
-		options: {
-			responsive: true,
-			maintainAspectRatio: false,
-			plugins: {
-				legend: {
-					position: "bottom"
-				},
-				tooltip: {
+					backgroundColor: "#111827",
+					titleColor: "#fff",
+					bodyColor: "#e5e7eb",
+					padding: 10,
+					displayColors: false,
 					callbacks: {
 						label: function (context: any) {
 							const data = context.dataset.data;
 							const total = data.reduce((a: number, b: number) => a + b, 0);
 
 							const value = context.raw || 0;
-							const percent = total > 0 ? ((value / total) * 100).toFixed(2) : 0;
+							const percent = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
 
-							return `${context.label}: ${percent}% (${value} คน)`;
+							return `${context.label}
+→ ${value.toLocaleString()} คน (${percent}%)`;
 						}
 					}
 				}
@@ -479,6 +441,73 @@ function initCharts(): void {
 		}
 	});
 
+	// 🔵 จำนวนลูกค้าแบ่งตามระดับ
+	revenueTrendChart = new Chart(document.getElementById("revenueTrendChart"), {
+		type: "bar",
+		data: {
+			labels: ["ใช้งานน้อย", "ปานกลาง", "สูง"],
+			datasets: [{
+				label: "จำนวนลูกค้า",
+				data: [],
+				backgroundColor: ["#b0cdff", "#4588fb", "#005bf9"]
+			}]
+		},
+		options: baseOptions("คน")
+	});
+
+	// 🟣 รายได้ตามช่องทาง
+	channelChart = new Chart(document.getElementById("channelChart"), {
+		type: "bar",
+		data: {
+			labels: [],
+			datasets: [{
+				labels: ["บุคคลทั่วไป", "นิสิต/นักศึกษา"],
+				data: [],
+				backgroundColor: ["#6366f1", "#f59e0b"]
+			}]
+		},
+		options: baseOptions("บาท")
+	});
+
+	// 🟡 สัดส่วนประเภทลูกค้า
+	bookingRatioChart = new Chart(document.getElementById("bookingRatioChart"), {
+		type: "doughnut",
+		data: {
+			labels: ["บุคคลทั่วไป", "นิสิต/นักศึกษา"],
+			datasets: [{
+				data: [],
+				backgroundColor: ["#6366f1", "#f59e0b"]
+			}]
+		},
+		options: {
+			responsive: true,
+			maintainAspectRatio: false,
+			plugins: {
+				legend: { position: "bottom" },
+				tooltip: {
+					backgroundColor: "#111827",
+					titleColor: "#fff",
+					bodyColor: "#e5e7eb",
+					padding: 10,
+					displayColors: false,
+					callbacks: {
+						label: function (context: any) {
+							const data = context.dataset.data;
+							const total = data.reduce((a: number, b: number) => a + b, 0);
+
+							const value = context.raw || 0;
+							const percent = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+
+							return `${context.label}
+→ ${value.toLocaleString()} คน (${percent}%)`;
+						}
+					}
+				}
+			}
+		}
+	});
+
+	// 🔷 ลูกค้าตามสาขา
 	branchChart = new Chart(document.getElementById("topChart"), {
 		type: "bar",
 		data: {

@@ -2,7 +2,7 @@
 session_start();
 header('Content-Type: application/json');
 
-// 1. ตรวจสอบการ Login และสิทธิ์สาขา
+// 1. ตรวจสอบการ Login
 if (!isset($_SESSION["staff_id"]) || !isset($_SESSION["branch_id"])) {
     echo json_encode(["success" => false, "message" => "Unauthorized"]);
     exit;
@@ -12,16 +12,16 @@ require_once '../../database.php';
 
 $branchId = $conn->real_escape_string($_SESSION["branch_id"]);
 
-// 2. รับค่าจากตัวกรอง (Sidebar Filters)
+// 2. รับค่าจากตัวกรอง
 $range       = $_GET['range'] ?? 'all';
-$userType    = $_GET['user_type'] ?? '';   
+$userType    = $_GET['user_type'] ?? '';    
 $facultyId   = $_GET['faculty_id'] ?? '';
 $year        = $_GET['year'] ?? '';
 $bookingType = $_GET['booking_type'] ?? ''; 
 $startDate   = $_GET['start_date'] ?? '';
 $endDate     = $_GET['end_date'] ?? '';
 
-// 3. สร้างเงื่อนไข WHERE (บังคับดูเฉพาะสาขาตนเอง)
+// 3. สร้างเงื่อนไข WHERE
 $whereClauses = ["b.branch_id = '$branchId'", "b.booking_status_id != 6"]; 
 
 // ตัวกรองช่วงเวลา
@@ -39,10 +39,27 @@ if ($range === '7days') {
 if ($bookingType === 'online') $whereClauses[] = "b.booking_type_id = 1";
 elseif ($bookingType === 'walkin') $whereClauses[] = "b.booking_type_id = 2";
 
-// ตัวกรองข้อมูลลูกค้า (ต้อง JOIN customers)
-if ($userType !== '')   $whereClauses[] = "c.customer_type = '$userType'";
-if ($facultyId !== '')  $whereClauses[] = "c.faculty_id = " . intval($facultyId);
-if ($year !== '')       $whereClauses[] = "c.study_year = " . intval($year);
+if ($userType !== '') {
+    if ($userType === 'student') {
+        $whereClauses[] = "c.customer_type = 'student' AND c.branch_id = b.branch_id";
+    } elseif ($userType === 'general') {
+        $whereClauses[] = "c.customer_type = 'general' AND c.branch_id = b.branch_id";
+    } elseif ($userType === 'external') {
+        $whereClauses[] = "(c.branch_id != b.branch_id OR c.branch_id IS NULL)";
+    }
+}
+
+if ($facultyId !== '') {
+    $whereClauses[] = "c.faculty_id = " . intval($facultyId);
+    $whereClauses[] = "c.customer_type = 'student'";
+    $whereClauses[] = "c.branch_id = '$branchId'"; 
+}
+
+if ($year !== '') {
+    $whereClauses[] = "c.study_year = " . intval($year);
+    $whereClauses[] = "c.customer_type = 'student'";
+    $whereClauses[] = "c.branch_id = '$branchId'";
+}
 
 $whereSql = "WHERE " . implode(" AND ", $whereClauses);
 
@@ -75,7 +92,7 @@ $usedAssets = $conn->query("
 
 $utilRate = ($totalAssets > 0) ? ($usedAssets / $totalAssets) * 100 : 0;
 
-// --- 5. Booking Trend (ย้อนหลัง 6 เดือน) ---
+// --- 5. Booking Trend (นับจำนวนการจอง) ---
 $trendLabels = []; $trendValues = [];
 $trendRes = $conn->query("
     SELECT DATE_FORMAT(b.pickup_time, '%b') as month_name, COUNT(DISTINCT b.booking_id) as count 
@@ -100,6 +117,7 @@ $sourceRes = $conn->query("
     $whereSql
 ")->fetch_assoc();
 
+// --- 7. Heatmap ---
 $heatmap = array_fill(1, 7, array_fill(8, 14, 0)); 
 $heatRes = $conn->query("
     SELECT DAYOFWEEK(b.pickup_time) as day, HOUR(b.pickup_time) as hour, COUNT(*) as count
@@ -112,12 +130,11 @@ while($r = $heatRes->fetch_assoc()){
     $heatmap[$r['day']][$r['hour']] = (int)$r['count'];
 }
 
-// --- 8. ส่งข้อมูลออกเป็น JSON ---
 echo json_encode([
     "success" => true,
     "branch_name" => $_SESSION["branch_name"] ?? 'Unknown',
     "kpi" => [
-        "revenue" => number_format((float)$kpiRes['total_revenue'], 2),
+        "revenue" => number_format((float)($kpiRes['total_revenue'] ?? 0), 2),
         "users" => (int)$kpiRes['total_users'],
         "bookings" => (int)$kpiRes['total_bookings'],
         "util" => round($utilRate, 1)

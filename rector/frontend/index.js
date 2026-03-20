@@ -209,7 +209,36 @@ function loadDashboard() {
                                     tension: 0.4
                                 }]
                         },
-                        options: { responsive: true, maintainAspectRatio: false }
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        callback: function (value) {
+                                            return value.toLocaleString() + " รายการ";
+                                        }
+                                    }
+                                }
+                            },
+                            plugins: {
+                                tooltip: {
+                                    callbacks: {
+                                        label: function (context) {
+                                            var label = context.dataset.label || '';
+                                            if (label) {
+                                                label += ': ';
+                                            }
+                                            if (context.parsed.y !== null) {
+                                                label += context.parsed.y.toLocaleString() + " รายการ";
+                                            }
+                                            return label;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     });
                     // 3. กราฟสัดส่วน Online vs Walk-in
                     renderChart("bookingSourceChart", {
@@ -218,17 +247,35 @@ function loadDashboard() {
                             labels: ["Online", "Walk-in"],
                             datasets: [{
                                     data: [data.charts.source.online, data.charts.source.walkin],
-                                    backgroundColor: ["#43a43b", "#3d74c1"]
+                                    backgroundColor: ["#43a43b", "#3d74c1"],
+                                    borderWidth: 0
                                 }]
                         },
                         options: {
-                            plugins: { legend: { position: 'bottom' } },
                             cutout: '70%',
                             responsive: true,
-                            maintainAspectRatio: false
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        usePointStyle: true,
+                                        padding: 20,
+                                        font: { size: 12 }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function (context) {
+                                            var label = context.label || '';
+                                            var value = context.raw || 0;
+                                            return " ".concat(label, ": ").concat(value, " \u0E23\u0E32\u0E22\u0E01\u0E32\u0E23");
+                                        }
+                                    }
+                                }
+                            }
                         }
                     });
-                    // 4. วาดกราฟแท่ง Peak Time (ใช้ข้อมูลจาก heatmap มารวมกัน)
                     if (data.charts && data.charts.heatmap) {
                         renderPeakBarChart(data.charts.heatmap);
                     }
@@ -260,7 +307,7 @@ function renderChart(id, config) {
 }
 /* ================= ฟังก์ชันสำหรับกราฟแท่ง Peak Time ================= */
 function renderPeakBarChart(heatData) {
-    var hours = Array.from({ length: 14 }, function (_, i) { return i + 8; });
+    var hours = Array.from({ length: 13 }, function (_, i) { return i + 8; });
     var hourlyTotals = hours.map(function (h) {
         var total = 0;
         for (var d = 1; d <= 7; d++) {
@@ -295,7 +342,15 @@ function renderPeakBarChart(heatData) {
                 legend: { display: false }
             },
             scales: {
-                y: { beginAtZero: true, ticks: { precision: 0 } }
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0,
+                        callback: function (value) {
+                            return value + " รายการ";
+                        }
+                    }
+                }
             }
         }
     });

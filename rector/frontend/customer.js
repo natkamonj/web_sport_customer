@@ -129,6 +129,24 @@ function initFilterEvents() {
         "rangeSelect", "bookingTypeSelect", "userTypeSelect",
         "facultySelect", "yearSelect", "genderSelect", "startDate", "endDate"
     ];
+    var userTypeEl = document.getElementById("userTypeSelect");
+    if (userTypeEl) {
+        userTypeEl.addEventListener("change", function () {
+            var facultyEl = document.getElementById("facultySelect");
+            var yearEl = document.getElementById("yearSelect");
+            var isNotStudent = this.value === "general" || this.value === "external";
+            if (facultyEl) {
+                facultyEl.disabled = isNotStudent;
+                if (isNotStudent)
+                    facultyEl.value = "";
+            }
+            if (yearEl) {
+                yearEl.disabled = isNotStudent;
+                if (isNotStudent)
+                    yearEl.value = "";
+            }
+        });
+    }
     filterIds.forEach(function (id) {
         var el = document.getElementById(id);
         if (el) {
@@ -184,7 +202,7 @@ function getFilters() {
 /* ================= LOAD DASHBOARD ================= */
 function loadDashboard() {
     return __awaiter(this, void 0, void 0, function () {
-        var filters, query, res, contentType, text, data, kpi, chartsData, err_3;
+        var filters, query, res, contentType, text, data, kpi, chartsData, genderLabels, genderColors, err_3;
         var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s;
         return __generator(this, function (_t) {
             switch (_t.label) {
@@ -217,15 +235,37 @@ function loadDashboard() {
                     renderChart("trendUsersChart", {
                         type: "line",
                         data: {
-                            labels: (_c = (_b = chartsData.trend) === null || _b === void 0 ? void 0 : _b.labels) !== null && _c !== void 0 ? _c : [],
+                            labels: ((_c = (_b = chartsData.trend) === null || _b === void 0 ? void 0 : _b.labels) !== null && _c !== void 0 ? _c : []).map(function (label) {
+                                var date = new Date(label + "-01");
+                                return date.toLocaleString('en-US', { month: 'short' });
+                            }),
                             datasets: [{
                                     label: "จำนวนผู้เข้าใช้งาน (คน)",
                                     data: (_e = (_d = chartsData.trend) === null || _d === void 0 ? void 0 : _d.data) !== null && _e !== void 0 ? _e : [],
                                     borderColor: "#339af0",
                                     backgroundColor: "rgba(51, 154, 240, 0.1)",
                                     fill: true,
-                                    tension: 0.3
+                                    tension: 0,
+                                    cubicInterpolationMode: 'monotone'
                                 }]
+                        },
+                        options: {
+                            animation: false,
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    min: 0,
+                                    ticks: {
+                                        stepSize: 1,
+                                        precision: 0,
+                                        callback: function (value) {
+                                            return value.toLocaleString() + " คน";
+                                        }
+                                    }
+                                }
+                            }
                         }
                     });
                     // 2. อันดับคณะ
@@ -236,25 +276,75 @@ function loadDashboard() {
                             datasets: [{
                                     label: "จำนวนนิสิต (คน)",
                                     data: (_j = (_h = chartsData.top_faculty) === null || _h === void 0 ? void 0 : _h.data) !== null && _j !== void 0 ? _j : [],
-                                    backgroundColor: "#51cf66"
+                                    backgroundColor: "#51cf66",
+                                    barThickness: 25,
+                                    maxBarThickness: 30,
+                                    categoryPercentage: 0.8
                                 }]
                         },
                         options: {
                             indexAxis: "y",
-                            plugins: { legend: { display: false } }
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                x: {
+                                    beginAtZero: true,
+                                    suggestedMax: 1,
+                                    ticks: {
+                                        stepSize: 1,
+                                        precision: 0,
+                                        callback: function (value) {
+                                            return value + " คน";
+                                        }
+                                    }
+                                },
+                                y: {
+                                    ticks: {
+                                        padding: 10,
+                                        font: { size: 12 }
+                                    }
+                                }
+                            }
                         }
                     });
-                    // 3. สัดส่วนเพศ
+                    genderLabels = (_l = (_k = chartsData.gender) === null || _k === void 0 ? void 0 : _k.labels) !== null && _l !== void 0 ? _l : [];
+                    genderColors = genderLabels.map(function (label) {
+                        var cleanLabel = label.trim();
+                        if (cleanLabel === 'ชาย')
+                            return "#4dabf7";
+                        if (cleanLabel === 'หญิง')
+                            return "#ff69b4";
+                        return "#adb5bd";
+                    });
                     renderChart("genderChart", {
                         type: "doughnut",
                         data: {
-                            labels: (_l = (_k = chartsData.gender) === null || _k === void 0 ? void 0 : _k.labels) !== null && _l !== void 0 ? _l : [],
+                            labels: genderLabels,
                             datasets: [{
                                     data: (_o = (_m = chartsData.gender) === null || _m === void 0 ? void 0 : _m.data) !== null && _o !== void 0 ? _o : [],
-                                    backgroundColor: ["#4dabf7", "#ff69b4", "#adb5bd"]
+                                    backgroundColor: genderColors
                                 }]
                         },
-                        options: { plugins: { legend: { position: 'bottom' } } }
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            cutout: '70%',
+                            plugins: {
+                                legend: { position: 'bottom' },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function (context) {
+                                            var label = context.label || '';
+                                            var value = context.raw || 0;
+                                            return " ".concat(label, ": ").concat(value, " \u0E04\u0E19");
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     });
                     // 4. สถิติตามชั้นปี
                     renderChart("yearChart", {
@@ -266,6 +356,34 @@ function loadDashboard() {
                                     data: (_s = (_r = chartsData.year) === null || _r === void 0 ? void 0 : _r.data) !== null && _s !== void 0 ? _s : [],
                                     backgroundColor: "#ff922b"
                                 }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        stepSize: 1,
+                                        precision: 0,
+                                        callback: function (value) {
+                                            return value.toLocaleString() + " คน";
+                                        }
+                                    }
+                                }
+                            },
+                            plugins: {
+                                legend: {
+                                    display: false
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function (context) {
+                                            return "\u0E08\u0E33\u0E19\u0E27\u0E19: ".concat(context.parsed.y.toLocaleString(), " \u0E04\u0E19");
+                                        }
+                                    }
+                                }
+                            }
                         }
                     });
                     return [3 /*break*/, 6];

@@ -145,17 +145,24 @@ body {
   border-radius: 16px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.05);
   border-top: 3px solid #ff7a00;
-  transition: transform .18s ease;
+  transition: all .18s ease;
 }
 
 .kpi-card:hover {
   transform: translateY(-3px);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.08);
+}
+
+.kpi-title {
+  font-size: 13px;
+  color: #6b7280;
 }
 
 .kpi-value {
   font-size: 28px;
   font-weight: 700;
   margin-top: 8px;
+  letter-spacing: .3px;
 }
 
 /* ================= CARD ================= */

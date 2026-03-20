@@ -49,16 +49,40 @@ if ($bookingType === 'online') $bookingCond .= " AND b.booking_type_id = 1";
 elseif ($bookingType === 'walkin') $bookingCond .= " AND b.booking_type_id = 2";
 
 $whereCustomer = [];
-if ($userType !== '')   $whereCustomer[] = "c.customer_type = '" . $conn->real_escape_string($userType) . "'";
-if ($facultyId !== '')  $whereCustomer[] = "c.faculty_id = " . intval($facultyId);
-if ($year !== '')       $whereCustomer[] = "c.study_year = " . intval($year);
+if ($userType !== '') {
+    if ($userType === 'student') {
+        $whereCustomer[] = "c.customer_type = 'student' AND c.branch_id = b.branch_id";
+    } elseif ($userType === 'general') {
+        $whereCustomer[] = "c.customer_type = 'general' AND c.branch_id = b.branch_id";
+    } elseif ($userType === 'external') {
+        $whereCustomer[] = "(c.branch_id != b.branch_id OR c.branch_id IS NULL)";
+    }
+}
+if ($facultyId !== '') {
+    $whereCustomer[] = "c.faculty_id = " . intval($facultyId);
+    $whereCustomer[] = "c.branch_id = '$branchId'"; 
+    $whereCustomer[] = "c.customer_type = 'student'"; 
+}
+if ($year !== '') {
+    $whereCustomer[] = "c.study_year = " . intval($year);
+    $whereCustomer[] = "c.branch_id = '$branchId'"; 
+    $whereCustomer[] = "c.customer_type = 'student'";
+}
 if ($genderId !== '')   $whereCustomer[] = "c.gender_id = " . intval($genderId);
 
 $combinedWhere = array_merge($whereBooking, $whereCustomer);
 $whereJoinSql = "WHERE " . implode(" AND ", $combinedWhere);
 
 $custCond = "";
-if ($userType !== '')   { $custCond .= " AND c.customer_type = '" . $conn->real_escape_string($userType) . "'"; }
+if ($userType !== '') {
+    if ($userType === 'student') {
+        $custCond .= " AND c.customer_type = 'student' AND c.branch_id = b.branch_id";
+    } elseif ($userType === 'general') {
+        $custCond .= " AND c.customer_type = 'general' AND c.branch_id = b.branch_id";
+    } elseif ($userType === 'external') {
+        $custCond .= " AND (c.branch_id != b.branch_id OR c.branch_id IS NULL)";
+    }
+}
 if ($facultyId !== '')  { $custCond .= " AND c.faculty_id = " . intval($facultyId); }
 if ($year !== '')       { $custCond .= " AND c.study_year = " . intval($year); }
 if ($genderId !== '')   { $custCond .= " AND c.gender_id = " . intval($genderId); }
@@ -67,12 +91,12 @@ if ($genderId !== '')   { $custCond .= " AND c.gender_id = " . intval($genderId)
 $allUsersRes = $conn->query("
     SELECT 
         COUNT(DISTINCT b.customer_id) AS total_all,
-
         COUNT(DISTINCT CASE WHEN c.customer_type = 'student' AND c.branch_id = b.branch_id THEN b.customer_id END) AS total_std,
-
         COUNT(DISTINCT CASE WHEN c.customer_type = 'general' AND c.branch_id = b.branch_id THEN b.customer_id END) AS total_gen,
-        
-        COUNT(DISTINCT CASE WHEN c.branch_id != b.branch_id OR c.branch_id IS NULL THEN b.customer_id END) AS total_out
+        COUNT(DISTINCT CASE 
+            WHEN (c.branch_id != b.branch_id OR c.branch_id IS NULL) 
+            THEN b.customer_id 
+        END) AS total_out
     FROM bookings b
     JOIN customers c ON b.customer_id = c.customer_id
     $whereJoinSql
@@ -104,46 +128,60 @@ while ($r = $trendRes->fetch_assoc()) { $trendLabels[] = $r['m']; $trendData[] =
 
 // Top Faculty 
 $topFacLabels = []; $topFacData = [];
-$topFacRes = $conn->query("
-    SELECT f.name, COUNT(b.booking_id) AS total 
-    FROM faculty f 
-    LEFT JOIN customers c ON f.id = c.faculty_id $custCond 
-    LEFT JOIN bookings b ON c.customer_id = b.customer_id $bookingCond 
-    GROUP BY f.id 
-    ORDER BY total DESC, f.name ASC LIMIT 5
-");
-while ($r = $topFacRes->fetch_assoc()) { $topFacLabels[] = $r['name']; $topFacData[] = (int)$r['total']; }
+if ($userType !== 'general' && $userType !== 'external') {
+    $topFacRes = $conn->query("
+        SELECT f.name, COUNT(DISTINCT b.customer_id) AS total 
+        FROM faculty f 
+        JOIN customers c ON f.id = c.faculty_id 
+        JOIN bookings b ON c.customer_id = b.customer_id 
+        $whereJoinSql 
+        AND c.customer_type = 'student' 
+        AND c.branch_id = '$branchId' 
+        GROUP BY f.id 
+        ORDER BY total DESC LIMIT 5
+    ");
+    while ($r = $topFacRes->fetch_assoc()) { 
+        $topFacLabels[] = $r['name']; 
+        $topFacData[] = (int)$r['total']; 
+    }
+}
 
 // Gender 
 $genLabels = []; $genData = [];
 $genRes = $conn->query("
-    SELECT g.name_th, COUNT(DISTINCT b.customer_id) AS total_people 
-    FROM genders g 
-    LEFT JOIN customers c ON g.gender_id = c.gender_id $custCond 
-    LEFT JOIN bookings b ON c.customer_id = b.customer_id $bookingCond 
+    SELECT 
+        g.name_th, 
+        COUNT(DISTINCT b.customer_id) AS total_people 
+    FROM bookings b
+    JOIN customers c ON b.customer_id = c.customer_id
+    JOIN genders g ON c.gender_id = g.gender_id
+    $whereJoinSql
     GROUP BY g.gender_id
+    ORDER BY g.gender_id ASC
 ");
-while ($r = $genRes->fetch_assoc()) { $genLabels[] = $r['name_th']; $genData[] = (int)$r['total_people']; }
 
+while ($r = $genRes->fetch_assoc()) { 
+    $genLabels[] = $r['name_th']; 
+    $genData[] = (int)$r['total_people']; 
+}
 // Year 
 $yearLabels = []; $yearData = [];
-$yRes = $conn->query("
-    SELECT 
-        t.study_year, 
-        COUNT(DISTINCT b.customer_id) AS total_users
-    FROM (
-        SELECT 1 AS study_year UNION SELECT 2 UNION SELECT 3 
-        UNION SELECT 4 UNION SELECT 5 UNION SELECT 6
-    ) AS t
-    LEFT JOIN customers c ON t.study_year = c.study_year $custCond
-    LEFT JOIN bookings b ON c.customer_id = b.customer_id $bookingCond
-    GROUP BY t.study_year 
-    ORDER BY t.study_year
-");
-
-while ($r = $yRes->fetch_assoc()) { 
-    $yearLabels[] = "ปี " . $r['study_year']; 
-    $yearData[] = (int)$r['total_users']; 
+if ($userType !== 'general' && $userType !== 'external') {
+    $yRes = $conn->query("
+        SELECT c.study_year, COUNT(DISTINCT b.customer_id) AS total_users
+        FROM customers c
+        JOIN bookings b ON c.customer_id = b.customer_id
+        $whereJoinSql
+        AND c.customer_type = 'student' 
+        AND c.branch_id = '$branchId'  
+        AND c.study_year BETWEEN 1 AND 6
+        GROUP BY c.study_year 
+        ORDER BY c.study_year
+    ");
+    while ($r = $yRes->fetch_assoc()) { 
+        $yearLabels[] = "ปี " . $r['study_year']; 
+        $yearData[] = (int)$r['total_users']; 
+    }
 }
 
 // --- FILTER OPTIONS ---

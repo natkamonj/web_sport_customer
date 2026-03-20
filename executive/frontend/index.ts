@@ -5,9 +5,10 @@ let revenueTrendChart: any;
 let channelChart: any;
 let bookingRatioChart: any;
 let branchChart: any;
+let overviewChart: any;
 
 /* ==============================
-   INIT
+	 INIT
 ============================== */
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -24,7 +25,7 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 /* ==============================
-   FILTER EVENTS
+	 FILTER EVENTS
 ============================== */
 
 function bindFilters(): void {
@@ -53,7 +54,7 @@ function bindFilters(): void {
 }
 
 /* ==============================
-   FILTER LOGIC
+	 FILTER LOGIC
 ============================== */
 
 function getFilter() {
@@ -75,7 +76,7 @@ function toggleCustomDate(): void {
 
 function resetFilter(): void {
 
-	(document.getElementById("rangeSelect") as any).value = "30days";
+	(document.getElementById("rangeSelect") as any).value = "";
 	(document.getElementById("regionSelect") as any).value = "";
 	(document.getElementById("provinceSelect") as any).value = "";
 	(document.getElementById("branchSelect") as any).value = "";
@@ -87,7 +88,7 @@ function resetFilter(): void {
 }
 
 /* ==============================
-   LOAD DASHBOARD
+	 LOAD DASHBOARD
 ============================== */
 
 function loadAll(): void {
@@ -102,8 +103,11 @@ function loadAll(): void {
 
 			updateKPI(result.kpi);
 
-			updateBookingTrend(result.trend);
-			updateRevenueTrend(result.trend);
+updateOverview(result.trend_finance);
+
+updateBookingTrend(result.trend_booking);
+
+updateRevenueTrend(result.trend_revenue);
 
 			updateChannel(result.channel);
 
@@ -111,12 +115,13 @@ function loadAll(): void {
 
 			updateBranches(result.branches);
 
+
 		})
 		.catch(err => console.error("โหลด Dashboard ไม่สำเร็จ", err));
 }
 
 /* ==============================
-   KPI
+	 KPI
 ============================== */
 
 function updateKPI(kpi: any): void {
@@ -136,25 +141,35 @@ function updateKPI(kpi: any): void {
 }
 
 /* ==============================
-   UPDATE CHARTS
+	 UPDATE CHARTS
 ============================== */
 
 function updateBookingTrend(data: any): void {
-	bookingTrendChart.data.labels = data?.labels || [];
-	bookingTrendChart.data.datasets[0].data = data?.bookings || [];
-	bookingTrendChart.update();
+  bookingTrendChart.data.labels = data?.labels || [];
+  bookingTrendChart.data.datasets[0].data = data?.data || []; 
+  bookingTrendChart.update();
 }
 
 function updateRevenueTrend(data: any): void {
-	revenueTrendChart.data.labels = data?.labels || [];
-	revenueTrendChart.data.datasets[0].data = data?.revenue || [];
-	revenueTrendChart.update();
+  revenueTrendChart.data.labels = data?.labels || [];
+  revenueTrendChart.data.datasets[0].data = data?.data || []; 
+  revenueTrendChart.update();
 }
 
 function updateChannel(data: any): void {
 	channelChart.data.labels = data?.labels || [];
 	channelChart.data.datasets[0].data = data?.data || [];
 	channelChart.update();
+}
+
+function updateOverview(data: any): void {
+	overviewChart.data.labels = data?.labels || [];
+
+	overviewChart.data.datasets[0].data = data?.revenue || [];
+	overviewChart.data.datasets[1].data = data?.expense || []; 
+	overviewChart.data.datasets[2].data = data?.profit || [];
+
+	overviewChart.update();
 }
 
 function updateBookingRatio(data: any): void {
@@ -182,7 +197,7 @@ function updateBranches(data: any): void {
 }
 
 /* ==============================
-   DROPDOWNS
+	 DROPDOWNS
 ============================== */
 
 function loadRegions(): void {
@@ -255,6 +270,7 @@ function loadBranches(): void {
 
 function initCharts(): void {
 
+
 	const baseOptions = {
 		responsive: true,
 		maintainAspectRatio: false,
@@ -278,6 +294,47 @@ function initCharts(): void {
 			}
 		}
 	};
+
+	overviewChart = new Chart(document.getElementById("overviewChart"), {
+		type: "line",
+		data: {
+			labels: [],
+			datasets: [
+				{
+					label: "รายได้",
+					data: [],
+					borderColor: "#22c55e",
+					backgroundColor: "rgba(34,197,94,0.1)",
+					tension: 0.4
+				},
+				{
+					label: "ค่าใช้จ่าย",
+					data: [],
+					borderColor: "#ef4444",
+					backgroundColor: "rgba(239,68,68,0.1)",
+					tension: 0.4
+				},
+				{
+					label: "กำไรสุทธิ",
+					data: [],
+					borderColor: "#8b5cf6",
+					backgroundColor: "rgba(139,92,246,0.1)",
+					tension: 0.4
+				}
+			]
+		},
+		options: {
+			responsive: true,
+			maintainAspectRatio: false,
+			scales: {
+				y: {
+					ticks: {
+						callback: (v: any) => v.toLocaleString() + " บาท"
+					}
+				}
+			}
+		}
+	});
 
 	// 📊 BOOKING TREND
 	bookingTrendChart = new Chart(document.getElementById("bookingTrendChart"), {
@@ -354,65 +411,65 @@ function initCharts(): void {
 		}
 	});
 
-// 🥧 STATUS
-bookingRatioChart = new Chart(document.getElementById("bookingRatioChart"), {
-	type: "doughnut",
-	data: {
-		labels: [],
-		datasets: [{
-			data: [],
-			backgroundColor: []
-		}]
-	},
-	options: {
-		...baseOptions,
-		cutout: "65%",
-		plugins: {
-			tooltip: {
-				callbacks: {
-					label: function (context: any) {
-						let label = context.label || "";
-						let val = context.raw || 0;
-						return `${label}: ${val.toLocaleString()} ครั้ง`; // ✅ แก้เป็น "ครั้ง"
-					}
-				}
-			}
-		}
-	}
-});
-
-
-// 🏢 ALL BRANCHES (รายได้สุทธิ)
-branchChart = new Chart(document.getElementById("topChart"), {
-	type: "bar",
-	data: {
-		labels: [],
-		datasets: [{
-			label: "รายได้สุทธิ", // ✅ เปลี่ยน label
-			data: [],
-			backgroundColor: "#ff7a00"
-		}]
-	},
-	options: {
-		...baseOptions,
-		indexAxis: "y",
-		scales: {
-			x: {
-				ticks: {
-					callback: (v: any) => v.toLocaleString() + " บาท" // ✅ format เงิน
-				}
-			}
+	// 🥧 STATUS
+	bookingRatioChart = new Chart(document.getElementById("bookingRatioChart"), {
+		type: "doughnut",
+		data: {
+			labels: [],
+			datasets: [{
+				data: [],
+				backgroundColor: []
+			}]
 		},
-		plugins: {
-			tooltip: {
-				callbacks: {
-					label: function (context: any) {
-						let val = context.raw || 0;
-						return `รายได้: ${val.toLocaleString()} บาท`; // ✅ tooltip เป็นเงิน
+		options: {
+			...baseOptions,
+			cutout: "65%",
+			plugins: {
+				tooltip: {
+					callbacks: {
+						label: function (context: any) {
+							let label = context.label || "";
+							let val = context.raw || 0;
+							return `${label}: ${val.toLocaleString()} ครั้ง`; // ✅ แก้เป็น "ครั้ง"
+						}
 					}
 				}
 			}
 		}
-	}
-});
+	});
+
+
+	// 🏢 ALL BRANCHES (รายได้สุทธิ)
+	branchChart = new Chart(document.getElementById("topChart"), {
+		type: "bar",
+		data: {
+			labels: [],
+			datasets: [{
+				label: "รายได้สุทธิ", // ✅ เปลี่ยน label
+				data: [],
+				backgroundColor: "#ff7a00"
+			}]
+		},
+		options: {
+			...baseOptions,
+			indexAxis: "y",
+			scales: {
+				x: {
+					ticks: {
+						callback: (v: any) => v.toLocaleString() + " บาท" // ✅ format เงิน
+					}
+				}
+			},
+			plugins: {
+				tooltip: {
+					callbacks: {
+						label: function (context: any) {
+							let val = context.raw || 0;
+							return `รายได้: ${val.toLocaleString()} บาท`; // ✅ tooltip เป็นเงิน
+						}
+					}
+				}
+			}
+		}
+	});
 }

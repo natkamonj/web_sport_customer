@@ -67,7 +67,7 @@ function toggleCustomDate() {
     box.style.display = range === "custom" ? "block" : "none";
 }
 function resetFilter() {
-    document.getElementById("rangeSelect").value = "30days";
+    document.getElementById("rangeSelect").value = "";
     document.getElementById("regionSelect").value = "";
     document.getElementById("provinceSelect").value = "";
     document.getElementById("branchSelect").value = "";
@@ -90,7 +90,7 @@ function loadAll() {
         .then(function (result) {
         updateKPI(result.kpi);
         updatePopular(result.popular);
-        updateUsage(result.usage);
+        updateUsage(result.trend_booking);
         updateDamage(result.damage);
         updateDamageTop(result.damage_top); // 🔥 ใหม่
         updateRepair(result.repair);
@@ -194,6 +194,35 @@ function loadBranches() {
    INIT CHART
 ============================== */
 function initCharts() {
+    var baseOptions = function (unit) {
+        if (unit === void 0) { unit = ""; }
+        return ({
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: "bottom" },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            var value = context.raw || 0;
+                            return value.toLocaleString() + (unit ? " " + unit : "");
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    min: 0,
+                    ticks: {
+                        stepSize: 1,
+                        precision: 0,
+                        callback: function (v) { return (v % 1 === 0 ? v + (unit ? " " + unit : "") : ""); }
+                    }
+                }
+            }
+        });
+    };
+    // 🔵 จำนวนครั้งใช้งาน
     popularChart = new Chart(document.getElementById("popularChart"), {
         type: "bar",
         data: {
@@ -203,8 +232,10 @@ function initCharts() {
                     data: [],
                     backgroundColor: "#3b82f6"
                 }]
-        }
+        },
+        options: baseOptions("ครั้ง")
     });
+    // 🟢 การใช้งาน (line)
     usageChart = new Chart(document.getElementById("usageChart"), {
         type: "line",
         data: {
@@ -215,8 +246,10 @@ function initCharts() {
                     borderColor: "#22c55e",
                     fill: false
                 }]
-        }
+        },
+        options: baseOptions("ครั้ง")
     });
+    // 🟡 สถานะอุปกรณ์ (doughnut)
     damageChart = new Chart(document.getElementById("damageChart"), {
         type: "doughnut",
         data: {
@@ -225,8 +258,27 @@ function initCharts() {
                     data: [0, 0],
                     backgroundColor: ["#22c55e", "#ef4444"]
                 }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: "bottom" },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            var data = context.dataset.data;
+                            var total = data.reduce(function (a, b) { return a + b; }, 0);
+                            var value = context.raw || 0;
+                            var percent = total > 0 ? ((value / total) * 100).toFixed(2) : 0;
+                            return "".concat(context.label, ": ").concat(percent, "% (").concat(value.toLocaleString(), " \u0E04\u0E23\u0E31\u0E49\u0E07)");
+                        }
+                    }
+                }
+            }
         }
     });
+    // 🔴 เสียหายสูงสุด
     damageTopChart = new Chart(document.getElementById("damageTopChart"), {
         type: "bar",
         data: {
@@ -236,17 +288,20 @@ function initCharts() {
                     data: [],
                     backgroundColor: "#ef4444"
                 }]
-        }
+        },
+        options: baseOptions("ครั้ง")
     });
+    // 🟠 ซ่อม (ค่าใช้จ่าย)
     repairChart = new Chart(document.getElementById("repairChart"), {
         type: "bar",
         data: {
             labels: [],
             datasets: [{
-                    label: "จำนวนการซ่อม",
+                    label: "ค่าใช้จ่ายในการซ่อม",
                     data: [],
                     backgroundColor: "#f97316"
                 }]
-        }
+        },
+        options: baseOptions("บาท") // 👈 เปลี่ยนหน่วย
     });
 }
