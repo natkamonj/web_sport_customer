@@ -227,6 +227,91 @@ try {
         }
     }
 
+/* ===============================
+   HANDLE POINT (USE + EARN)
+================================ */
+
+/* 🔒 LOCK + CHECK POINT */
+$check = $conn->prepare("
+    SELECT current_points 
+    FROM customers 
+    WHERE customer_id = ?
+    FOR UPDATE
+");
+
+$check->bind_param("s", $customerId);
+$check->execute();
+$user = $check->get_result()->fetch_assoc();
+
+if (!$user) throw new Exception("ไม่พบลูกค้า");
+
+$currentPoints = (int)$user["current_points"];
+
+/* ❗ กันใช้เกิน */
+if ($usedPoints > $currentPoints) {
+    throw new Exception("แต้มไม่พอ");
+}
+
+/* ===============================
+   UPDATE POINT
+================================ */
+
+/* คำนวณแต้มสุทธิ */
+$pointChange = (-$usedPoints) + $pointsEarned;
+
+if ($pointChange != 0) {
+
+    $update = $conn->prepare("
+        UPDATE customers
+        SET current_points = current_points + ?
+        WHERE customer_id = ?
+    ");
+
+    $update->bind_param("is", $pointChange, $customerId);
+
+    if (!$update->execute()) {
+        throw new Exception($update->error);
+    }
+}
+
+/* ===============================
+   INSERT HISTORY
+================================ */
+
+/* 🔻 ใช้แต้ม */
+if ($usedPoints > 0) {
+
+    $stmt = $conn->prepare("
+        INSERT INTO point_history
+        (customer_id, booking_id, type, amount, description)
+        VALUES (?, ?, 'use', ?, 'ใช้แต้มจากการเช่า')
+    ");
+
+    $amount = -$usedPoints;
+
+    $stmt->bind_param("ssi", $customerId, $bookingCode, $amount);
+
+    if (!$stmt->execute()) {
+        throw new Exception($stmt->error);
+    }
+}
+
+/* 🔺 ได้แต้ม */
+if ($pointsEarned > 0) {
+
+    $stmt = $conn->prepare("
+        INSERT INTO point_history
+        (customer_id, booking_id, type, amount, description)
+        VALUES (?, ?, 'earn', ?, 'ได้แต้มจากการเช่า')
+    ");
+
+    $stmt->bind_param("ssi", $customerId, $bookingCode, $pointsEarned);
+
+    if (!$stmt->execute()) {
+        throw new Exception($stmt->error);
+    }
+}
+
     $conn->commit();
 
     echo json_encode([
