@@ -106,7 +106,7 @@ function loadAll() {
 function updateKPI(kpi) {
     var _a, _b, _c, _d;
     document.getElementById("kpiBookings").textContent =
-        Number((_a = kpi === null || kpi === void 0 ? void 0 : kpi.total_bookings) !== null && _a !== void 0 ? _a : 0).toLocaleString() + " ครั้ง";
+        Number((_a = kpi === null || kpi === void 0 ? void 0 : kpi.total_bookings) !== null && _a !== void 0 ? _a : 0).toLocaleString() + " รายการ";
     document.getElementById("kpiRevenue").textContent =
         Number((_b = kpi === null || kpi === void 0 ? void 0 : kpi.total_revenue) !== null && _b !== void 0 ? _b : 0).toLocaleString() + " บาท";
     document.getElementById("kpiAvg").textContent =
@@ -376,7 +376,7 @@ function initCharts() {
                         label: function (context) {
                             var label = context.label || "";
                             var val = context.raw || 0;
-                            return "".concat(label, ": ").concat(val.toLocaleString(), " \u0E04\u0E23\u0E31\u0E49\u0E07"); // ✅ แก้เป็น "ครั้ง"
+                            return "".concat(label, ": ").concat(val.toLocaleString(), " \u0E04\u0E23\u0E31\u0E49\u0E07");
                         }
                     }
                 }

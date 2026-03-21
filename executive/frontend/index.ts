@@ -127,7 +127,7 @@ function loadAll(): void {
 function updateKPI(kpi: any): void {
 
 	document.getElementById("kpiBookings")!.textContent =
-		Number(kpi?.total_bookings ?? 0).toLocaleString() + " ครั้ง";
+		Number(kpi?.total_bookings ?? 0).toLocaleString() + " รายการ";
 
 	document.getElementById("kpiRevenue")!.textContent =
 		Number(kpi?.total_revenue ?? 0).toLocaleString() + " บาท";
@@ -447,7 +447,7 @@ function initCharts(): void {
 						label: function (context: any) {
 							let label = context.label || "";
 							let val = context.raw || 0;
-							return `${label}: ${val.toLocaleString()} ครั้ง`; // ✅ แก้เป็น "ครั้ง"
+							return `${label}: ${val.toLocaleString()} ครั้ง`;
 						}
 					}
 				}

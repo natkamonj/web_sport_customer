@@ -35,8 +35,14 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
     }
 };
 var _this = this;
+/* ==============================
+   GLOBAL
+============================== */
 var charts = {};
 var dashboardTimer = null;
+/* ==============================
+   INIT
+============================== */
 document.addEventListener("DOMContentLoaded", function () { return __awaiter(_this, void 0, void 0, function () {
     return __generator(this, function (_a) {
         switch (_a.label) {
@@ -55,7 +61,9 @@ document.addEventListener("DOMContentLoaded", function () { return __awaiter(_th
         }
     });
 }); });
-/* ================= SESSION CHECK ================= */
+/* ==============================
+   SESSION
+============================== */
 function checkSession() {
     return __awaiter(this, void 0, void 0, function () {
         var res, data, err_1;
@@ -82,7 +90,9 @@ function checkSession() {
         });
     });
 }
-/* ================= LOAD FILTER OPTIONS ================= */
+/* ==============================
+   FILTER - LOAD OPTIONS
+============================== */
 function loadFilterOptions() {
     return __awaiter(this, void 0, void 0, function () {
         var res, data, facSelect_1, yearSelect_1, err_2;
@@ -104,7 +114,9 @@ function loadFilterOptions() {
                     yearSelect_1 = document.getElementById("yearSelect");
                     if (yearSelect_1) {
                         yearSelect_1.innerHTML = '<option value="">ทุกชั้นปี</option>';
-                        [1, 2, 3, 4, 5, 6].forEach(function (y) { return yearSelect_1.add(new Option("\u0E1B\u0E35 ".concat(y), y)); });
+                        [1, 2, 3, 4, 5, 6].forEach(function (y) {
+                            return yearSelect_1.add(new Option("\u0E1B\u0E35 ".concat(y), y));
+                        });
                     }
                     return [3 /*break*/, 4];
                 case 3:
@@ -116,13 +128,21 @@ function loadFilterOptions() {
         });
     });
 }
-/* ================= INIT FILTER EVENTS ================= */
+/* ==============================
+   FILTER EVENTS
+============================== */
 function initFilterEvents() {
     var _a;
     var filterIds = [
-        "rangeSelect", "bookingTypeSelect", "userTypeSelect",
-        "facultySelect", "yearSelect", "startDate", "endDate"
+        "rangeSelect",
+        "bookingTypeSelect",
+        "userTypeSelect",
+        "facultySelect",
+        "yearSelect",
+        "startDate",
+        "endDate"
     ];
+    // change event
     filterIds.forEach(function (id) {
         var el = document.getElementById(id);
         if (el) {
@@ -133,11 +153,15 @@ function initFilterEvents() {
             });
         }
     });
+    // reset button
     (_a = document.getElementById("resetFilter")) === null || _a === void 0 ? void 0 : _a.addEventListener("click", function () {
         resetFilters();
         loadDashboard();
     });
 }
+/* ==============================
+   FILTER LOGIC
+============================== */
 function debounceLoad() {
     clearTimeout(dashboardTimer);
     dashboardTimer = setTimeout(function () { return loadDashboard(); }, 300);
@@ -146,11 +170,19 @@ function toggleCustomDate() {
     var rangeEl = document.getElementById("rangeSelect");
     var box = document.getElementById("customDateBox");
     if (rangeEl && box) {
-        box.style.display = rangeEl.value === "custom" ? "flex" : "none";
+        box.style.display = rangeEl.value === "custom" ? "block" : "none";
     }
 }
 function resetFilters() {
-    var ids = ["rangeSelect", "bookingTypeSelect", "userTypeSelect", "facultySelect", "yearSelect", "startDate", "endDate"];
+    var ids = [
+        "rangeSelect",
+        "bookingTypeSelect",
+        "userTypeSelect",
+        "facultySelect",
+        "yearSelect",
+        "startDate",
+        "endDate"
+    ];
     ids.forEach(function (id) {
         var el = document.getElementById(id);
         if (el) {
@@ -171,10 +203,12 @@ function getFilters() {
         year: ((_g = document.getElementById("yearSelect")) === null || _g === void 0 ? void 0 : _g.value) || ""
     };
 }
-/* ================= LOAD DASHBOARD ================= */
+/* ==============================
+   LOAD DASHBOARD
+============================== */
 function loadDashboard() {
     return __awaiter(this, void 0, void 0, function () {
-        var filters, query, res, data, kpi, err_3;
+        var filters, query, res, data, err_3;
         var _a;
         return __generator(this, function (_b) {
             switch (_b.label) {
@@ -190,101 +224,10 @@ function loadDashboard() {
                     data = _b.sent();
                     if (!data.success)
                         return [2 /*return*/];
-                    kpi = (_a = data.kpi) !== null && _a !== void 0 ? _a : {};
-                    document.getElementById("kpiRevenue").innerText = kpi.revenue || "0";
-                    document.getElementById("kpiUsers").innerText = (kpi.users || 0).toLocaleString();
-                    document.getElementById("kpiBookings").innerText = (kpi.bookings || 0).toLocaleString();
-                    document.getElementById("kpiUtil").innerText = (kpi.util || 0) + "%";
-                    // 2. กราฟแนวโน้ม (Booking Trend)
-                    renderChart("bookingTrendChart", {
-                        type: "line",
-                        data: {
-                            labels: data.charts.trend.labels,
-                            datasets: [{
-                                    label: "จำนวนการจอง",
-                                    data: data.charts.trend.data,
-                                    borderColor: "#ff7a00",
-                                    backgroundColor: "rgba(255, 122, 0, 0.1)",
-                                    fill: true,
-                                    tension: 0.4
-                                }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    ticks: {
-                                        callback: function (value) {
-                                            return value.toLocaleString() + " รายการ";
-                                        }
-                                    }
-                                }
-                            },
-                            plugins: {
-                                tooltip: {
-                                    callbacks: {
-                                        label: function (context) {
-                                            var label = context.dataset.label || '';
-                                            if (label) {
-                                                label += ': ';
-                                            }
-                                            if (context.parsed.y !== null) {
-                                                label += context.parsed.y.toLocaleString() + " รายการ";
-                                            }
-                                            return label;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    });
-                    // 3. กราฟสัดส่วน Online vs Walk-in
-                    renderChart("bookingSourceChart", {
-                        type: "doughnut",
-                        data: {
-                            labels: ["Online", "Walk-in"],
-                            datasets: [{
-                                    data: [data.charts.source.online, data.charts.source.walkin],
-                                    backgroundColor: ["#43a43b", "#3d74c1"],
-                                    borderWidth: 0
-                                }]
-                        },
-                        options: {
-                            cutout: '70%',
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'bottom',
-                                    labels: {
-                                        usePointStyle: true,
-                                        padding: 20,
-                                        font: { size: 12 }
-                                    }
-                                },
-                                tooltip: {
-                                    callbacks: {
-                                        label: function (context) {
-                                            var label = context.label || '';
-                                            var value = context.raw || 0;
-                                            return " ".concat(label, ": ").concat(value, " \u0E23\u0E32\u0E22\u0E01\u0E32\u0E23");
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    });
-                    if (data.charts && data.charts.heatmap) {
-                        renderPeakBarChart(data.charts.heatmap);
-                    }
-                    // 5. อัปเดตตัวเลขสรุป Peak Time
-                    if (data.peak_summary) {
-                        document.getElementById("peakMorning").innerText = data.peak_summary.morning.hour || "--:--";
-                        document.getElementById("peakAfternoon").innerText = data.peak_summary.afternoon.hour || "--:--";
-                        document.getElementById("peakEvening").innerText = data.peak_summary.evening.hour || "--:--";
-                    }
+                    // KPI
+                    updateKPI((_a = data.kpi) !== null && _a !== void 0 ? _a : {});
+                    // Charts
+                    updateCharts(data);
                     return [3 /*break*/, 4];
                 case 3:
                     err_3 = _b.sent();
@@ -295,6 +238,135 @@ function loadDashboard() {
         });
     });
 }
+/* ==============================
+   KPI
+============================== */
+function updateKPI(kpi) {
+    document.getElementById("kpiRevenue").innerText =
+        kpi.revenue || "0";
+    document.getElementById("kpiUsers").innerText =
+        (kpi.users || 0).toLocaleString();
+    document.getElementById("kpiBookings").innerText =
+        (kpi.bookings || 0).toLocaleString();
+    document.getElementById("kpiUtil").innerText =
+        (kpi.util || 0) + "%";
+}
+/* ==============================
+   UPDATE ALL DATA
+============================== */
+function updateCharts(data) {
+    // Trend
+    renderBookingTrend(data.charts.trend);
+    // Source
+    renderBookingSource(data.charts.source);
+    // Peak chart
+    if (data.charts && data.charts.heatmap) {
+        renderPeakBarChart(data.charts.heatmap);
+    }
+    // Peak summary
+    if (data.peak_summary) {
+        updatePeakSummary(data.peak_summary);
+    }
+}
+/* ==============================
+   CHARTS
+============================== */
+function renderBookingTrend(trend) {
+    renderChart("bookingTrendChart", {
+        type: "line",
+        data: {
+            labels: trend.labels,
+            datasets: [{
+                    label: "จำนวนการจอง",
+                    data: trend.data,
+                    borderColor: "#ff7a00",
+                    backgroundColor: "rgba(255, 122, 0, 0.1)",
+                    fill: true,
+                    tension: 0.4
+                }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function (value) {
+                            return value.toLocaleString() + " รายการ";
+                        }
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            var label = context.dataset.label || '';
+                            if (label)
+                                label += ': ';
+                            if (context.parsed.y !== null) {
+                                label += context.parsed.y.toLocaleString() + " รายการ";
+                            }
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+function renderBookingSource(source) {
+    renderChart("bookingSourceChart", {
+        type: "doughnut",
+        data: {
+            labels: ["Online", "Walk-in"],
+            datasets: [{
+                    data: [source.online, source.walkin],
+                    backgroundColor: ["#43a43b", "#3d74c1"],
+                    borderWidth: 0
+                }]
+        },
+        options: {
+            cutout: '70%',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 20,
+                        font: { size: 12 }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            var label = context.label || '';
+                            var value = context.raw || 0;
+                            return " ".concat(label, ": ").concat(value, " \u0E23\u0E32\u0E22\u0E01\u0E32\u0E23");
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+/* ==============================
+   PEAK SUMMARY
+============================== */
+function updatePeakSummary(summary) {
+    document.getElementById("peakMorning").innerText =
+        summary.morning.hour || "--:--";
+    document.getElementById("peakAfternoon").innerText =
+        summary.afternoon.hour || "--:--";
+    document.getElementById("peakEvening").innerText =
+        summary.evening.hour || "--:--";
+}
+/* ==============================
+   CHART UTIL
+============================== */
 function renderChart(id, config) {
     var canvas = document.getElementById(id);
     if (!canvas)
@@ -305,7 +377,9 @@ function renderChart(id, config) {
     var ctx = canvas.getContext("2d");
     charts[id] = new Chart(ctx, config);
 }
-/* ================= ฟังก์ชันสำหรับกราฟแท่ง Peak Time ================= */
+/* ==============================
+   PEAK CHART
+============================== */
 function renderPeakBarChart(heatData) {
     var hours = Array.from({ length: 13 }, function (_, i) { return i + 8; });
     var hourlyTotals = hours.map(function (h) {
@@ -321,7 +395,7 @@ function renderPeakBarChart(heatData) {
         if (h <= 12)
             return '#ec5b75';
         if (h <= 17)
-            return '#bf2bff';
+            return '#ff2bce';
         return '#ea2323';
     });
     renderChart("peakHourBarChart", {

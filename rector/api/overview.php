@@ -2,17 +2,23 @@
 session_start();
 header('Content-Type: application/json');
 
-// 1. ตรวจสอบการ Login
+require_once '../../database.php'; 
+
+
+/* ==============================
+   1. AUTH CHECK
+============================== */
 if (!isset($_SESSION["staff_id"]) || !isset($_SESSION["branch_id"])) {
     echo json_encode(["success" => false, "message" => "Unauthorized"]);
     exit;
 }
 
-require_once '../../database.php'; 
-
 $branchId = $conn->real_escape_string($_SESSION["branch_id"]);
 
-// 2. รับค่าจากตัวกรอง
+
+/* ==============================
+   2. GET FILTERS
+============================== */
 $range       = $_GET['range'] ?? 'all';
 $userType    = $_GET['user_type'] ?? '';    
 $facultyId   = $_GET['faculty_id'] ?? '';
@@ -21,40 +27,60 @@ $bookingType = $_GET['booking_type'] ?? '';
 $startDate   = $_GET['start_date'] ?? '';
 $endDate     = $_GET['end_date'] ?? '';
 
-// 3. สร้างเงื่อนไข WHERE
-$whereClauses = ["b.branch_id = '$branchId'", "b.booking_status_id != 6"]; 
 
-// ตัวกรองช่วงเวลา
+/* ==============================
+   3. BUILD WHERE
+============================== */
+$whereClauses = [
+    "b.branch_id = '$branchId'",
+    "b.booking_status_id != 6"
+];
+
+/* ----- DATE RANGE ----- */
 if ($range === '7days') {
     $whereClauses[] = "b.pickup_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
-} elseif ($range === '30days') {
+}
+elseif ($range === '30days') {
     $whereClauses[] = "b.pickup_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
-} elseif ($range === 'custom' && $startDate && $endDate) {
+}
+elseif ($range === 'custom' && $startDate && $endDate) {
     $s = $conn->real_escape_string($startDate);
     $e = $conn->real_escape_string($endDate);
     $whereClauses[] = "DATE(b.pickup_time) BETWEEN '$s' AND '$e'";
 }
 
-// ตัวกรองประเภทการจอง
-if ($bookingType === 'online') $whereClauses[] = "b.booking_type_id = 1";
-elseif ($bookingType === 'walkin') $whereClauses[] = "b.booking_type_id = 2";
+/* ----- BOOKING TYPE ----- */
+if ($bookingType === 'online') {
+    $whereClauses[] = "b.booking_type_id = 1";
+}
+elseif ($bookingType === 'walkin') {
+    $whereClauses[] = "b.booking_type_id = 2";
+}
 
+/* ----- USER TYPE ----- */
 if ($userType !== '') {
+
     if ($userType === 'student') {
-        $whereClauses[] = "c.customer_type = 'student' AND c.branch_id = b.branch_id";
-    } elseif ($userType === 'general') {
-        $whereClauses[] = "c.customer_type = 'general' AND c.branch_id = b.branch_id";
-    } elseif ($userType === 'external') {
+        $whereClauses[] = "c.customer_type = 'student'";
+        $whereClauses[] = "c.branch_id = b.branch_id";
+    }
+    elseif ($userType === 'general') {
+        $whereClauses[] = "c.customer_type = 'general'";
+        $whereClauses[] = "c.branch_id = b.branch_id";
+    }
+    elseif ($userType === 'external') {
         $whereClauses[] = "(c.branch_id != b.branch_id OR c.branch_id IS NULL)";
     }
 }
 
+/* ----- FACULTY ----- */
 if ($facultyId !== '') {
     $whereClauses[] = "c.faculty_id = " . intval($facultyId);
     $whereClauses[] = "c.customer_type = 'student'";
-    $whereClauses[] = "c.branch_id = '$branchId'"; 
+    $whereClauses[] = "c.branch_id = '$branchId'";
 }
 
+/* ----- YEAR ----- */
 if ($year !== '') {
     $whereClauses[] = "c.study_year = " . intval($year);
     $whereClauses[] = "c.customer_type = 'student'";
@@ -63,7 +89,10 @@ if ($year !== '') {
 
 $whereSql = "WHERE " . implode(" AND ", $whereClauses);
 
-// --- 4. ดึงข้อมูล KPI ---
+
+/* ==============================
+   4. KPI
+============================== */
 $kpiRes = $conn->query("
     SELECT 
         COUNT(DISTINCT b.customer_id) as total_users,
@@ -75,7 +104,8 @@ $kpiRes = $conn->query("
     $whereSql
 ")->fetch_assoc();
 
-// อัตราการใช้งาน (Utilization Rate)
+
+/* ----- UTILIZATION ----- */
 $totalAssets = $conn->query("
     SELECT 
         (SELECT COUNT(*) FROM equipment_instances WHERE branch_id='$branchId') + 
@@ -90,24 +120,38 @@ $usedAssets = $conn->query("
     $whereSql
 ")->fetch_assoc()['used'];
 
-$utilRate = ($totalAssets > 0) ? ($usedAssets / $totalAssets) * 100 : 0;
+$utilRate = ($totalAssets > 0)
+    ? ($usedAssets / $totalAssets) * 100
+    : 0;
 
-// --- 5. Booking Trend (นับจำนวนการจอง) ---
-$trendLabels = []; $trendValues = [];
+
+/* ==============================
+   5. BOOKING TREND
+============================== */
+$trendLabels = [];
+$trendValues = [];
+
 $trendRes = $conn->query("
-    SELECT DATE_FORMAT(b.pickup_time, '%b') as month_name, COUNT(DISTINCT b.booking_id) as count 
+    SELECT 
+        DATE_FORMAT(b.pickup_time, '%b') as month_name, 
+        COUNT(DISTINCT b.booking_id) as count 
     FROM bookings b 
     LEFT JOIN customers c ON b.customer_id = c.customer_id
-    $whereSql AND b.pickup_time >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+    $whereSql 
+    AND b.pickup_time >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
     GROUP BY YEAR(b.pickup_time), MONTH(b.pickup_time) 
     ORDER BY b.pickup_time ASC
 ");
-while($r = $trendRes->fetch_assoc()){
+
+while ($r = $trendRes->fetch_assoc()) {
     $trendLabels[] = $r['month_name'];
     $trendValues[] = (int)$r['count'];
 }
 
-// --- 6. Online vs Walk-in ---
+
+/* ==============================
+   6. BOOKING SOURCE
+============================== */
 $sourceRes = $conn->query("
     SELECT 
         COUNT(DISTINCT CASE WHEN b.booking_type_id = 1 THEN b.booking_id END) as online,
@@ -117,31 +161,52 @@ $sourceRes = $conn->query("
     $whereSql
 ")->fetch_assoc();
 
-// --- 7. Heatmap ---
-$heatmap = array_fill(1, 7, array_fill(8, 14, 0)); 
+
+/* ==============================
+   7. HEATMAP
+============================== */
+$heatmap = array_fill(1, 7, array_fill(8, 14, 0));
+
 $heatRes = $conn->query("
-    SELECT DAYOFWEEK(b.pickup_time) as day, HOUR(b.pickup_time) as hour, COUNT(*) as count
+    SELECT 
+        DAYOFWEEK(b.pickup_time) as day, 
+        HOUR(b.pickup_time) as hour, 
+        COUNT(*) as count
     FROM bookings b
     LEFT JOIN customers c ON b.customer_id = c.customer_id
-    $whereSql AND HOUR(b.pickup_time) BETWEEN 8 AND 21
+    $whereSql 
+    AND HOUR(b.pickup_time) BETWEEN 8 AND 21
     GROUP BY day, hour
 ");
-while($r = $heatRes->fetch_assoc()){
+
+while ($r = $heatRes->fetch_assoc()) {
     $heatmap[$r['day']][$r['hour']] = (int)$r['count'];
 }
 
+
+/* ==============================
+   8. RESPONSE
+============================== */
 echo json_encode([
     "success" => true,
     "branch_name" => $_SESSION["branch_name"] ?? 'Unknown',
+
     "kpi" => [
-        "revenue" => number_format((float)($kpiRes['total_revenue'] ?? 0), 2),
-        "users" => (int)$kpiRes['total_users'],
+        "revenue"  => number_format((float)($kpiRes['total_revenue'] ?? 0), 2),
+        "users"    => (int)$kpiRes['total_users'],
         "bookings" => (int)$kpiRes['total_bookings'],
-        "util" => round($utilRate, 1)
+        "util"     => round($utilRate, 1)
     ],
+
     "charts" => [
-        "trend" => ["labels" => $trendLabels, "data" => $trendValues],
-        "source" => ["online" => (int)$sourceRes['online'], "walkin" => (int)$sourceRes['walkin']],
+        "trend" => [
+            "labels" => $trendLabels,
+            "data"   => $trendValues
+        ],
+        "source" => [
+            "online" => (int)$sourceRes['online'],
+            "walkin" => (int)$sourceRes['walkin']
+        ],
         "heatmap" => $heatmap
     ]
 ]);
