@@ -24,7 +24,7 @@ SELECT
     d.name_th AS damage_name_th,
     s.status_id,
     s.name_th AS status_name_th
-FROM Maintenance_logs m
+FROM maintenance_logs m
 JOIN equipment_instances ei 
     ON m.instance_code = ei.instance_code
 LEFT JOIN damage_levels d 
